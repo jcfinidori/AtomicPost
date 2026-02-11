@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XRPL Stablecoin PoC UI</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: Arial, sans-serif; margin: 2rem; max-width: 920px; }
+      h1 { margin-bottom: 0.5rem; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      label { display: block; font-size: 0.9rem; margin-bottom: 4px; }
+      input { width: 100%; padding: 8px; box-sizing: border-box; }
+      button { margin-top: 1rem; padding: 10px 16px; cursor: pointer; }
+      pre { white-space: pre-wrap; border: 1px solid #8885; border-radius: 6px; padding: 12px; min-height: 160px; }
+      .muted { color: #666; }
+      .section { margin-top: 1.2rem; }
+    </style>
+  </head>
+  <body>
+    <h1>XRPL Stablecoin PoC Runner</h1>
+    <p class="muted">Run the existing PoC script with custom parameters and view output.</p>
+
+    <div class="grid">
+      <div>
+        <label for="networkUrl">XRPL Network URL</label>
+        <input id="networkUrl" value="wss://s.altnet.rippletest.net:51233" />
+      </div>
+      <div>
+        <label for="currencyCode">Currency Code</label>
+        <input id="currencyCode" value="USD" />
+      </div>
+      <div>
+        <label for="issueAmount">Issue Amount</label>
+        <input id="issueAmount" value="1000" />
+      </div>
+      <div>
+        <label for="distributeAmount">Distribute Amount</label>
+        <input id="distributeAmount" value="250" />
+      </div>
+      <div>
+        <label for="redeemAmount">Redeem Amount</label>
+        <input id="redeemAmount" value="50" />
+      </div>
+      <div>
+        <label for="settlementCycleId">Settlement Cycle ID</label>
+        <input id="settlementCycleId" placeholder="CYCLE_2026-02-11" />
+      </div>
+      <div>
+        <label for="issuanceAuthId">Issuance Auth ID</label>
+        <input id="issuanceAuthId" placeholder="IA_POC_001" />
+      </div>
+      <div>
+        <label for="paymentInstructionId">Payment Instruction ID</label>
+        <input id="paymentInstructionId" placeholder="PI_POC_001" />
+      </div>
+    </div>
+
+    <button id="runBtn">Run PoC</button>
+
+    <div class="section">
+      <h3>Stdout</h3>
+      <pre id="stdout"></pre>
+    </div>
+
+    <div class="section">
+      <h3>Stderr</h3>
+      <pre id="stderr"></pre>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
