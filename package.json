@@ -1,0 +1,15 @@
+{
+  "name": "atomicpost-xrpl-stablecoin-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proof-of-concept stablecoin lifecycle on XRPL testnet.",
+  "license": "MIT",
+  "scripts": {
+    "poc": "node scripts/poc-stablecoin-xrpl.js",
+    "check": "node --check scripts/poc-stablecoin-xrpl.js",
+    "ui": "node ui-server.js"
+  },
+  "dependencies": {
+    "xrpl": "^4.2.5"
+  }
+}
