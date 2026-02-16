@@ -1,20 +1,21 @@
-# PoC Stablecoin on XRPL ("XPRL")
+# PoC Stablecoin on XRPL
 
 This repository contains a minimal proof-of-concept flow for launching a fiat-backed stablecoin on the XRP Ledger testnet.
 
-> You wrote "XPRL". The ledger/network is generally referred to as **XRPL** (XRP Ledger), so this guide and script use XRPL naming.
-
 ## What this PoC demonstrates
 
-- Creating three wallets on XRPL Testnet:
+- Creating five wallets on XRPL Testnet:
   - **Issuer** (token origin account)
-  - **Treasury/Distributor** (operational account that receives/forwards issued tokens)
-  - **User** (end holder)
+  - **Treasury** (operational liquidity account)
+  - **Operator A** (net creditor in PoC settlement)
+  - **Operator B** (net debtor in PoC settlement)
+  - **Operator C** (net debtor in PoC settlement)
 - Configuring issuer account flags suitable for a managed token setup.
 - Establishing trust lines from treasury and user to the issuer.
 - Issuing a USD-denominated IOU token (`USD`) to treasury.
-- Transferring a portion of issued tokens from treasury to user.
-- Optionally redeeming user balance back to issuer.
+- Funding net-debtor operators (B and C) from treasury for settlement execution.
+- Settling net obligations on-ledger from operators B/C to operator A.
+- Optionally redeeming operator A balance back to issuer.
 
 ## Architecture (PoC)
 
@@ -24,8 +25,9 @@ This repository contains a minimal proof-of-concept flow for launching a fiat-ba
 - **Treasury account**
   - Holds and distributes minted supply.
   - Keeps issuer private key operationally isolated from user-facing flows.
-- **User account**
+- **Operator accounts (A/B/C)**
   - Must explicitly trust the issuer and currency via trust lines.
+  - B and C are funded for net-debtor settlement flows; A receives on-ledger settlement and performs redemption.
 
 ## Prerequisites
 
@@ -93,6 +95,7 @@ Optional environment variables:
 - `MAX_RETRY_ATTEMPTS` (default: `3`)
 - `RETRY_INTERVAL_CYCLES` (default: `1`)
 - `TRUSTLINE_GOVERNANCE_ENFORCED` (`true`/`false`, default: `true`)
+- `OPERATOR_B_SHARE` (default: `0.6`; Operator C share is `1 - OPERATOR_B_SHARE`)
 - `RECON_OUTPUT_PATH` (default: `artifacts/settlement-log.json`)
 
 
@@ -134,17 +137,24 @@ Trustline governance checks (PoC-safe implementation):
 - On failure (when enforcement enabled), the PoC blocks payment and returns an explicit governance error
 - Successful runs store trustline check evidence in the reconciliation artifact (`trustlineGovernance`)
 
+Three-operator settlement flow (A/B/C):
+- Treasury funds Operator B and Operator C based on a deterministic share split of the net settlement amount
+- Share split is controlled by `OPERATOR_B_SHARE` (for example `0.6` => B settles 60%, C settles 40%)
+- Two on-ledger settlement payments are executed and reconciled: `OperatorB -> OperatorA` and `OperatorC -> OperatorA`
+- The reconciliation artifact stores per-operator transaction hashes, memos, and rule outcomes
+
 Expected flow:
 
 1. Connect to testnet.
-2. Fund issuer/treasury/user wallets from faucet.
+2. Fund issuer, treasury, and operators A/B/C wallets from faucet.
 3. Set issuer flags.
-4. Add trust lines from treasury and user to issuer for `USD`.
+4. Add trust lines from treasury and operators A/B/C to issuer for `USD`.
 5. Issue `1000 USD` from issuer to treasury.
-6. Transfer `250 USD` from treasury to user.
-7. Redeem `50 USD` from user back to issuer.
-8. Print resulting balances and reserve details.
-9. Write a reconciliation artifact (`artifacts/settlement-log.json`) with transaction hashes and status.
+6. Fund Operator B and Operator C from treasury for settlement execution.
+7. Execute two on-ledger net settlements: Operator B -> Operator A and Operator C -> Operator A.
+8. Redeem `50 USD` from Operator A back to issuer.
+9. Print resulting balances and reserve details.
+10. Write a reconciliation artifact (`artifacts/settlement-log.json`) with transaction hashes and status.
 
 
 ## Run on Replit
@@ -176,4 +186,3 @@ This is only a demonstration. For a production stablecoin, you should also imple
 - `public/index.html`: form-based UI for setting PoC inputs and viewing outputs.
 - `public/app.js`: frontend logic for calling the run endpoint and rendering stdout/stderr.
 - `package.json`: npm scripts and dependency setup.
-

@@ -22,6 +22,7 @@ const BATCH_START_DATE = process.env.BATCH_START_DATE
 const BATCH_END_DATE = process.env.BATCH_END_DATE
 const BATCH_REFERENCE_IDS = process.env.BATCH_REFERENCE_IDS || ""
 const TRUSTLINE_GOVERNANCE_ENFORCED = String(process.env.TRUSTLINE_GOVERNANCE_ENFORCED || "true").toLowerCase() !== "false"
+const OPERATOR_B_SHARE = process.env.OPERATOR_B_SHARE || "0.6"
 const RECON_OUTPUT_PATH = process.env.RECON_OUTPUT_PATH || "artifacts/settlement-log.json"
 
 const MEMO_SCHEMA_KEYS = Object.freeze([
@@ -64,6 +65,10 @@ function asNonNegativeInt(name, value) {
     throw new Error(`${name} must be a non-negative integer, got: ${value}`)
   }
   return parsed
+}
+
+function normalizeAmount(value) {
+  return Number(value).toFixed(6).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1")
 }
 
 function isFilledString(value) {
@@ -242,11 +247,7 @@ async function evaluateTrustlineGovernance(client, params) {
         "sender_trustline_exists",
         Boolean(senderLine),
         EXCEPTION_CODES.TRUSTLINE_MISSING,
-        {
-          stage,
-          senderAddress,
-          issuerAddress,
-        },
+        { stage, senderAddress, issuerAddress },
       ),
     )
 
@@ -257,11 +258,7 @@ async function evaluateTrustlineGovernance(client, params) {
           "sender_balance_sufficient",
           senderBalance >= amountNumber,
           EXCEPTION_CODES.INSUFFICIENT_SENDER_BALANCE,
-          {
-            stage,
-            senderBalance,
-            amount: amountNumber,
-          },
+          { stage, senderBalance, amount: amountNumber },
         ),
       )
     }
@@ -275,11 +272,7 @@ async function evaluateTrustlineGovernance(client, params) {
         "destination_trustline_exists",
         Boolean(destinationLine),
         EXCEPTION_CODES.TRUSTLINE_MISSING,
-        {
-          stage,
-          destinationAddress,
-          issuerAddress,
-        },
+        { stage, destinationAddress, issuerAddress },
       ),
     )
 
@@ -402,6 +395,25 @@ function buildSettlementPlan() {
   }
 }
 
+function buildOperatorSettlementPlan(instructedSettlementAmount) {
+  const total = asPositiveNumber("instructedSettlement", instructedSettlementAmount)
+  const operatorBShare = asPositiveNumber("OPERATOR_B_SHARE", OPERATOR_B_SHARE)
+  if (operatorBShare > 1) {
+    throw new Error(`OPERATOR_B_SHARE must be between 0 and 1, got: ${OPERATOR_B_SHARE}`)
+  }
+
+  const operatorBAmount = Number((total * operatorBShare).toFixed(6))
+  const operatorCAmount = Number((total - operatorBAmount).toFixed(6))
+
+  return {
+    operatorBShare,
+    operatorCShare: Number((1 - operatorBShare).toFixed(6)),
+    operatorBAmount: normalizeAmount(operatorBAmount),
+    operatorCAmount: normalizeAmount(operatorCAmount),
+    totalAmount: normalizeAmount(total),
+  }
+}
+
 async function trustSet(client, wallet, issuer, currency, limit = "1000000") {
   const tx = {
     TransactionType: "TrustSet",
@@ -464,20 +476,24 @@ function buildCheck(name, pass, reasonCode, expected, observed, details) {
 
 function summarizeSettlementLog(settlementLog) {
   const checks = []
-  const settlementTxHash = settlementLog.transactions.settlement
-  const settlementExpected = Number(settlementLog.expectedAmounts.settlement)
-  const settlementActual = Number(settlementLog.actualAmounts.settlement)
-  const settlementDetail = settlementLog.transactionDetails.settlement
+
+  const settlementHashes = [
+    settlementLog.transactions.settlement.operatorBToA,
+    settlementLog.transactions.settlement.operatorCToA,
+  ]
 
   checks.push(
     buildCheck(
-      "tx_hash_present",
-      settlementTxHash !== "UNKNOWN_HASH",
+      "tx_hashes_present",
+      settlementHashes.every((hash) => hash !== "UNKNOWN_HASH"),
       EXCEPTION_CODES.MISSING_TX_HASH,
-      "non-empty hash",
-      settlementTxHash,
+      "2 settlement hashes",
+      settlementHashes,
     ),
   )
+
+  const settlementExpected = Number(settlementLog.expectedAmounts.settlement)
+  const settlementActual = Number(settlementLog.actualAmounts.settlement)
 
   checks.push(
     buildCheck(
@@ -489,55 +505,78 @@ function summarizeSettlementLog(settlementLog) {
     ),
   )
 
+  const settlementDetailB = settlementLog.transactionDetails.settlement.operatorBToA
+  const settlementDetailC = settlementLog.transactionDetails.settlement.operatorCToA
+
   checks.push(
     buildCheck(
       "counterparties_match",
-      settlementDetail.account === settlementLog.participants.treasury
-        && settlementDetail.destination === settlementLog.participants.counterparty,
+      settlementDetailB.account === settlementLog.participants.operatorB
+        && settlementDetailB.destination === settlementLog.participants.operatorA
+        && settlementDetailC.account === settlementLog.participants.operatorC
+        && settlementDetailC.destination === settlementLog.participants.operatorA,
       EXCEPTION_CODES.COUNTERPARTY_MISMATCH,
       {
-        account: settlementLog.participants.treasury,
-        destination: settlementLog.participants.counterparty,
+        operatorBToA: { account: settlementLog.participants.operatorB, destination: settlementLog.participants.operatorA },
+        operatorCToA: { account: settlementLog.participants.operatorC, destination: settlementLog.participants.operatorA },
       },
       {
-        account: settlementDetail.account,
-        destination: settlementDetail.destination,
+        operatorBToA: { account: settlementDetailB.account, destination: settlementDetailB.destination },
+        operatorCToA: { account: settlementDetailC.account, destination: settlementDetailC.destination },
       },
     ),
   )
 
-  const memoComparison = memoSchemaMatches(
-    createCanonicalMemoFields(PAYMENT_INSTRUCTION_ID, settlementLog.settlementPlan.partialFlag),
-    settlementLog.memos.settlement,
+  const memoComparisonB = memoSchemaMatches(
+    createCanonicalMemoFields(`${PAYMENT_INSTRUCTION_ID}_B`, settlementLog.settlementPlan.partialFlag),
+    settlementLog.memos.settlement.operatorBToA,
   )
+  const memoComparisonC = memoSchemaMatches(
+    createCanonicalMemoFields(`${PAYMENT_INSTRUCTION_ID}_C`, settlementLog.settlementPlan.partialFlag),
+    settlementLog.memos.settlement.operatorCToA,
+  )
+
   checks.push(
     buildCheck(
       "memo_schema_match",
-      memoComparison.pass,
+      memoComparisonB.pass && memoComparisonC.pass,
       EXCEPTION_CODES.MEMO_MISSING_OR_INVALID,
       MEMO_SCHEMA_KEYS,
-      MEMO_SCHEMA_KEYS.filter((key) => key in settlementLog.memos.settlement),
-      memoComparison.pass ? undefined : { mismatches: memoComparison.mismatches },
+      {
+        operatorBToA: MEMO_SCHEMA_KEYS.filter((key) => key in settlementLog.memos.settlement.operatorBToA),
+        operatorCToA: MEMO_SCHEMA_KEYS.filter((key) => key in settlementLog.memos.settlement.operatorCToA),
+      },
+      {
+        operatorBToA: memoComparisonB.mismatches,
+        operatorCToA: memoComparisonC.mismatches,
+      },
     ),
   )
 
   checks.push(
     buildCheck(
       "partial_flag_consistency",
-      settlementLog.memos.settlement.PartialFlag === settlementLog.settlementPlan.partialFlag,
+      settlementLog.memos.settlement.operatorBToA.PartialFlag === settlementLog.settlementPlan.partialFlag
+        && settlementLog.memos.settlement.operatorCToA.PartialFlag === settlementLog.settlementPlan.partialFlag,
       EXCEPTION_CODES.PARTIAL_PAYMENT,
       settlementLog.settlementPlan.partialFlag,
-      settlementLog.memos.settlement.PartialFlag,
+      {
+        operatorBToA: settlementLog.memos.settlement.operatorBToA.PartialFlag,
+        operatorCToA: settlementLog.memos.settlement.operatorCToA.PartialFlag,
+      },
     ),
   )
 
   checks.push(
     buildCheck(
       "ledger_result_success",
-      settlementDetail.resultCode === "tesSUCCESS",
+      settlementDetailB.resultCode === "tesSUCCESS" && settlementDetailC.resultCode === "tesSUCCESS",
       EXCEPTION_CODES.STATUS_NOT_SUCCESS,
-      "tesSUCCESS",
-      settlementDetail.resultCode,
+      "tesSUCCESS for both settlement tx",
+      {
+        operatorBToA: settlementDetailB.resultCode,
+        operatorCToA: settlementDetailC.resultCode,
+      },
     ),
   )
 
@@ -554,19 +593,24 @@ function summarizeSettlementLog(settlementLog) {
   checks.push(
     buildCheck(
       "trustline_governance_precheck",
-      settlementLog.trustlineGovernance.settlement.pass,
+      settlementLog.trustlineGovernance.settlement.operatorBToA.pass
+        && settlementLog.trustlineGovernance.settlement.operatorCToA.pass,
       EXCEPTION_CODES.TRUSTLINE_PRECHECK_FAILED,
       true,
-      settlementLog.trustlineGovernance.settlement.pass,
       {
-        reasons: settlementLog.trustlineGovernance.settlement.exceptionReasons,
+        operatorBToA: settlementLog.trustlineGovernance.settlement.operatorBToA.pass,
+        operatorCToA: settlementLog.trustlineGovernance.settlement.operatorCToA.pass,
+      },
+      {
+        operatorBToA: settlementLog.trustlineGovernance.settlement.operatorBToA.exceptionReasons,
+        operatorCToA: settlementLog.trustlineGovernance.settlement.operatorCToA.exceptionReasons,
       },
     ),
   )
 
   const failures = checks.filter((check) => !check.pass)
   settlementLog.reconciliation = {
-    method: "deterministic_rule_matcher_v2",
+    method: "deterministic_rule_matcher_v3_three_operators",
     checkedAt: new Date().toISOString(),
     checks,
     exceptionReasons: [...new Set(failures.map((failure) => failure.reasonCode))],
@@ -644,21 +688,28 @@ async function main() {
 
   try {
     const settlementPlan = buildSettlementPlan()
+    const operatorSettlementPlan = buildOperatorSettlementPlan(settlementPlan.instructedSettlement)
 
     const issuer = await client.fundWallet()
     const treasury = await client.fundWallet()
-    const user = await client.fundWallet()
+    const operatorA = await client.fundWallet()
+    const operatorB = await client.fundWallet()
+    const operatorC = await client.fundWallet()
 
     console.log("\nWallets funded on testnet:")
-    console.log(`- Issuer:   ${issuer.wallet.classicAddress}`)
-    console.log(`- Treasury: ${treasury.wallet.classicAddress}`)
-    console.log(`- User:     ${user.wallet.classicAddress}`)
+    console.log(`- Issuer:    ${issuer.wallet.classicAddress}`)
+    console.log(`- Treasury:  ${treasury.wallet.classicAddress}`)
+    console.log(`- OperatorA: ${operatorA.wallet.classicAddress}`)
+    console.log(`- OperatorB: ${operatorB.wallet.classicAddress}`)
+    console.log(`- OperatorC: ${operatorC.wallet.classicAddress}`)
 
     await setIssuerFlags(client, issuer.wallet)
     console.log("Issuer flags configured (DefaultRipple).")
 
     await trustSet(client, treasury.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
-    await trustSet(client, user.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    await trustSet(client, operatorA.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    await trustSet(client, operatorB.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    await trustSet(client, operatorC.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     console.log(`Trust lines created for ${CURRENCY_CODE}.`)
 
     const issuanceTrustlineCheck = await evaluateTrustlineGovernance(client, {
@@ -679,33 +730,97 @@ async function main() {
     }, issuanceMemo)
     console.log(`Issued ${ISSUE_AMOUNT} ${CURRENCY_CODE} to treasury.`)
 
-    const settlementTrustlineCheck = await evaluateTrustlineGovernance(client, {
-      stage: "settlement",
+    const fundingTrustlineCheckB = await evaluateTrustlineGovernance(client, {
+      stage: "operator_funding_B",
       senderAddress: treasury.wallet.classicAddress,
-      destinationAddress: user.wallet.classicAddress,
+      destinationAddress: operatorB.wallet.classicAddress,
       issuerAddress: issuer.wallet.classicAddress,
       currency: CURRENCY_CODE,
-      amount: String(settlementPlan.instructedSettlement),
+      amount: operatorSettlementPlan.operatorBAmount,
     })
-    enforceTrustlineGovernanceResult(settlementTrustlineCheck)
+    enforceTrustlineGovernanceResult(fundingTrustlineCheckB)
 
-    const settlementMemo = {
-      ...createCanonicalMemoFields(PAYMENT_INSTRUCTION_ID, settlementPlan.partialFlag),
+    const fundingMemoB = createCanonicalMemoFields("OPERATOR_FUNDING_B", "N")
+    const fundingResultB = await paymentWithMemo(client, treasury.wallet, operatorB.wallet.classicAddress, {
+      currency: CURRENCY_CODE,
+      issuer: issuer.wallet.classicAddress,
+      value: operatorSettlementPlan.operatorBAmount,
+    }, fundingMemoB)
+
+    const fundingTrustlineCheckC = await evaluateTrustlineGovernance(client, {
+      stage: "operator_funding_C",
+      senderAddress: treasury.wallet.classicAddress,
+      destinationAddress: operatorC.wallet.classicAddress,
+      issuerAddress: issuer.wallet.classicAddress,
+      currency: CURRENCY_CODE,
+      amount: operatorSettlementPlan.operatorCAmount,
+    })
+    enforceTrustlineGovernanceResult(fundingTrustlineCheckC)
+
+    const fundingMemoC = createCanonicalMemoFields("OPERATOR_FUNDING_C", "N")
+    const fundingResultC = await paymentWithMemo(client, treasury.wallet, operatorC.wallet.classicAddress, {
+      currency: CURRENCY_CODE,
+      issuer: issuer.wallet.classicAddress,
+      value: operatorSettlementPlan.operatorCAmount,
+    }, fundingMemoC)
+
+    console.log(`Funded OperatorB (${operatorSettlementPlan.operatorBAmount}) and OperatorC (${operatorSettlementPlan.operatorCAmount}) for settlement.`)
+
+    const settlementTrustlineCheckB = await evaluateTrustlineGovernance(client, {
+      stage: "settlement_operatorB_to_A",
+      senderAddress: operatorB.wallet.classicAddress,
+      destinationAddress: operatorA.wallet.classicAddress,
+      issuerAddress: issuer.wallet.classicAddress,
+      currency: CURRENCY_CODE,
+      amount: operatorSettlementPlan.operatorBAmount,
+    })
+    enforceTrustlineGovernanceResult(settlementTrustlineCheckB)
+
+    const settlementMemoB = {
+      ...createCanonicalMemoFields(`${PAYMENT_INSTRUCTION_ID}_B`, settlementPlan.partialFlag),
       BatchStartDate: settlementPlan.batch.batchStartDate,
       BatchEndDate: settlementPlan.batch.batchEndDate,
       BatchDays: String(settlementPlan.batch.batchDays),
       ReferenceObligationIDs: settlementPlan.batch.batchReferenceIds,
+      SettlementPair: "OperatorB->OperatorA",
     }
-    const settlementResult = await paymentWithMemo(client, treasury.wallet, user.wallet.classicAddress, {
+
+    const settlementResultB = await paymentWithMemo(client, operatorB.wallet, operatorA.wallet.classicAddress, {
       currency: CURRENCY_CODE,
       issuer: issuer.wallet.classicAddress,
-      value: String(settlementPlan.instructedSettlement),
-    }, settlementMemo)
-    console.log(`Distributed ${settlementPlan.instructedSettlement} ${CURRENCY_CODE} to user.`)
+      value: operatorSettlementPlan.operatorBAmount,
+    }, settlementMemoB)
+
+    const settlementTrustlineCheckC = await evaluateTrustlineGovernance(client, {
+      stage: "settlement_operatorC_to_A",
+      senderAddress: operatorC.wallet.classicAddress,
+      destinationAddress: operatorA.wallet.classicAddress,
+      issuerAddress: issuer.wallet.classicAddress,
+      currency: CURRENCY_CODE,
+      amount: operatorSettlementPlan.operatorCAmount,
+    })
+    enforceTrustlineGovernanceResult(settlementTrustlineCheckC)
+
+    const settlementMemoC = {
+      ...createCanonicalMemoFields(`${PAYMENT_INSTRUCTION_ID}_C`, settlementPlan.partialFlag),
+      BatchStartDate: settlementPlan.batch.batchStartDate,
+      BatchEndDate: settlementPlan.batch.batchEndDate,
+      BatchDays: String(settlementPlan.batch.batchDays),
+      ReferenceObligationIDs: settlementPlan.batch.batchReferenceIds,
+      SettlementPair: "OperatorC->OperatorA",
+    }
+
+    const settlementResultC = await paymentWithMemo(client, operatorC.wallet, operatorA.wallet.classicAddress, {
+      currency: CURRENCY_CODE,
+      issuer: issuer.wallet.classicAddress,
+      value: operatorSettlementPlan.operatorCAmount,
+    }, settlementMemoC)
+
+    console.log(`Settled net obligations on XRPL: OperatorB->A (${operatorSettlementPlan.operatorBAmount}), OperatorC->A (${operatorSettlementPlan.operatorCAmount}).`)
 
     const redemptionTrustlineCheck = await evaluateTrustlineGovernance(client, {
       stage: "redemption",
-      senderAddress: user.wallet.classicAddress,
+      senderAddress: operatorA.wallet.classicAddress,
       destinationAddress: issuer.wallet.classicAddress,
       issuerAddress: issuer.wallet.classicAddress,
       currency: CURRENCY_CODE,
@@ -714,12 +829,14 @@ async function main() {
     enforceTrustlineGovernanceResult(redemptionTrustlineCheck)
 
     const redemptionMemo = createCanonicalMemoFields("REDEMPTION", "N")
-    const redemptionResult = await paymentWithMemo(client, user.wallet, issuer.wallet.classicAddress, {
+    const redemptionResult = await paymentWithMemo(client, operatorA.wallet, issuer.wallet.classicAddress, {
       currency: CURRENCY_CODE,
       issuer: issuer.wallet.classicAddress,
       value: REDEEM_AMOUNT,
     }, redemptionMemo)
-    console.log(`Redeemed ${REDEEM_AMOUNT} ${CURRENCY_CODE} from user back to issuer.`)
+    console.log(`Redeemed ${REDEEM_AMOUNT} ${CURRENCY_CODE} from OperatorA back to issuer.`)
+
+    const settlementActualTotal = parseAmount(readIssuedCurrencyValue(settlementResultB)) + parseAmount(readIssuedCurrencyValue(settlementResultC))
 
     const settlementLog = {
       canonicalIds: {
@@ -736,11 +853,21 @@ async function main() {
       participants: {
         issuer: issuer.wallet.classicAddress,
         treasury: treasury.wallet.classicAddress,
-        counterparty: user.wallet.classicAddress,
+        operatorA: operatorA.wallet.classicAddress,
+        operatorB: operatorB.wallet.classicAddress,
+        operatorC: operatorC.wallet.classicAddress,
       },
+      operatorSettlementPlan,
       trustlineGovernance: {
         issuance: issuanceTrustlineCheck,
-        settlement: settlementTrustlineCheck,
+        operatorFunding: {
+          operatorB: fundingTrustlineCheckB,
+          operatorC: fundingTrustlineCheckC,
+        },
+        settlement: {
+          operatorBToA: settlementTrustlineCheckB,
+          operatorCToA: settlementTrustlineCheckC,
+        },
         redemption: redemptionTrustlineCheck,
       },
       settlementPlan,
@@ -748,20 +875,31 @@ async function main() {
       retry: settlementPlan.retry,
       expectedAmounts: {
         issuance: ISSUE_AMOUNT,
+        operatorFundingB: operatorSettlementPlan.operatorBAmount,
+        operatorFundingC: operatorSettlementPlan.operatorCAmount,
         settlementDaily: String(settlementPlan.batch.dailySettlementAmount),
-        settlement: String(settlementPlan.instructedSettlement),
+        settlement: operatorSettlementPlan.totalAmount,
         settlementRequested: String(settlementPlan.requestedSettlement),
         settlementPending: String(settlementPlan.pendingAmount),
         redemption: REDEEM_AMOUNT,
       },
       actualAmounts: {
         issuance: readIssuedCurrencyValue(issuanceResult),
-        settlement: readIssuedCurrencyValue(settlementResult),
+        operatorFundingB: readIssuedCurrencyValue(fundingResultB),
+        operatorFundingC: readIssuedCurrencyValue(fundingResultC),
+        settlement: normalizeAmount(settlementActualTotal),
+        settlementOperatorBToA: readIssuedCurrencyValue(settlementResultB),
+        settlementOperatorCToA: readIssuedCurrencyValue(settlementResultC),
         redemption: readIssuedCurrencyValue(redemptionResult),
       },
       transactions: {
         issuance: txHash(issuanceResult),
-        settlement: txHash(settlementResult),
+        operatorFundingB: txHash(fundingResultB),
+        operatorFundingC: txHash(fundingResultC),
+        settlement: {
+          operatorBToA: txHash(settlementResultB),
+          operatorCToA: txHash(settlementResultC),
+        },
         redemption: txHash(redemptionResult),
       },
       transactionDetails: {
@@ -770,10 +908,27 @@ async function main() {
           destination: txDestination(issuanceResult),
           resultCode: txResultCode(issuanceResult),
         },
+        operatorFundingB: {
+          account: txAccount(fundingResultB),
+          destination: txDestination(fundingResultB),
+          resultCode: txResultCode(fundingResultB),
+        },
+        operatorFundingC: {
+          account: txAccount(fundingResultC),
+          destination: txDestination(fundingResultC),
+          resultCode: txResultCode(fundingResultC),
+        },
         settlement: {
-          account: txAccount(settlementResult),
-          destination: txDestination(settlementResult),
-          resultCode: txResultCode(settlementResult),
+          operatorBToA: {
+            account: txAccount(settlementResultB),
+            destination: txDestination(settlementResultB),
+            resultCode: txResultCode(settlementResultB),
+          },
+          operatorCToA: {
+            account: txAccount(settlementResultC),
+            destination: txDestination(settlementResultC),
+            resultCode: txResultCode(settlementResultC),
+          },
         },
         redemption: {
           account: txAccount(redemptionResult),
@@ -783,7 +938,12 @@ async function main() {
       },
       memos: {
         issuance: issuanceMemo,
-        settlement: settlementMemo,
+        operatorFundingB: fundingMemoB,
+        operatorFundingC: fundingMemoC,
+        settlement: {
+          operatorBToA: settlementMemoB,
+          operatorCToA: settlementMemoC,
+        },
         redemption: redemptionMemo,
       },
       status: "Pending_Settlement",
@@ -796,7 +956,9 @@ async function main() {
 
     await printAccountSnapshot(client, "Issuer", issuer.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     await printAccountSnapshot(client, "Treasury", treasury.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
-    await printAccountSnapshot(client, "User", user.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    await printAccountSnapshot(client, "OperatorA", operatorA.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    await printAccountSnapshot(client, "OperatorB", operatorB.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    await printAccountSnapshot(client, "OperatorC", operatorC.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
   } finally {
     await client.disconnect()
   }
