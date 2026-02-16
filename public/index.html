@@ -10,16 +10,42 @@
       h1 { margin-bottom: 0.5rem; }
       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       label { display: block; font-size: 0.9rem; margin-bottom: 4px; }
-      input { width: 100%; padding: 8px; box-sizing: border-box; }
+      input, select { width: 100%; padding: 8px; box-sizing: border-box; }
       button { margin-top: 1rem; padding: 10px 16px; cursor: pointer; }
       pre { white-space: pre-wrap; border: 1px solid #8885; border-radius: 6px; padding: 12px; min-height: 160px; }
       .muted { color: #666; }
       .section { margin-top: 1.2rem; }
+      .csv-box { border: 1px solid #8885; border-radius: 6px; padding: 12px; margin: 1rem 0; }
+      #csvStatus { min-height: 1.2rem; margin-top: 8px; }
+      #csvPreview { min-height: 64px; }
     </style>
   </head>
   <body>
     <h1>XRPL Stablecoin PoC Runner</h1>
     <p class="muted">Run the existing PoC script with custom parameters and view output.</p>
+
+    <div class="csv-box">
+      <h3>Import net settlement CSV</h3>
+      <p class="muted">
+        Expected headers: <code>participant</code>, <code>total_outgoing_usd</code>, <code>total_incoming_usd</code>,
+        <code>net_pst_usd</code>.
+      </p>
+      <div class="grid">
+        <div>
+          <label for="csvFile">CSV file</label>
+          <input id="csvFile" type="file" accept=".csv,text/csv" />
+        </div>
+        <div>
+          <label for="participantSelect">Apply row</label>
+          <select id="participantSelect" disabled>
+            <option value="__all__">All participants (consolidated)</option>
+          </select>
+        </div>
+      </div>
+      <button id="applyCsvBtn" type="button" disabled>Apply CSV values to form</button>
+      <div id="csvStatus" class="muted"></div>
+      <pre id="csvPreview" class="muted"></pre>
+    </div>
 
     <div class="grid">
       <div>
@@ -53,6 +79,38 @@
       <div>
         <label for="paymentInstructionId">Payment Instruction ID</label>
         <input id="paymentInstructionId" placeholder="PI_POC_001" />
+      </div>
+      <div>
+        <label for="settlementApprovedAmount">Approved Settlement Amount (optional)</label>
+        <input id="settlementApprovedAmount" placeholder="e.g. 150" />
+      </div>
+      <div>
+        <label for="retryCount">Retry Count</label>
+        <input id="retryCount" value="0" />
+      </div>
+      <div>
+        <label for="maxRetryAttempts">Max Retry Attempts</label>
+        <input id="maxRetryAttempts" value="3" />
+      </div>
+      <div>
+        <label for="batchModeEnabled">Batch Mode Enabled</label>
+        <input id="batchModeEnabled" value="true" />
+      </div>
+      <div>
+        <label for="batchDays">Batch Days</label>
+        <input id="batchDays" value="1" />
+      </div>
+      <div>
+        <label for="batchStartDate">Batch Start Date (optional)</label>
+        <input id="batchStartDate" placeholder="YYYY-MM-DD" />
+      </div>
+      <div>
+        <label for="batchEndDate">Batch End Date (optional)</label>
+        <input id="batchEndDate" placeholder="YYYY-MM-DD" />
+      </div>
+      <div>
+        <label for="batchReferenceIds">Batch Reference IDs (optional)</label>
+        <input id="batchReferenceIds" placeholder="DAY_1,DAY_2" />
       </div>
     </div>
 

@@ -1,9 +1,20 @@
 const runBtn = document.getElementById("runBtn")
 const stdoutEl = document.getElementById("stdout")
 const stderrEl = document.getElementById("stderr")
+const csvFileInput = document.getElementById("csvFile")
+const participantSelect = document.getElementById("participantSelect")
+const applyCsvBtn = document.getElementById("applyCsvBtn")
+const csvStatusEl = document.getElementById("csvStatus")
+const csvPreviewEl = document.getElementById("csvPreview")
+
+let parsedCsvData = null
 
 function value(id) {
   return document.getElementById(id).value.trim()
+}
+
+function setFieldValue(id, nextValue) {
+  document.getElementById(id).value = nextValue
 }
 
 function apiRunPath() {
@@ -12,6 +23,202 @@ function apiRunPath() {
     : `${window.location.pathname}/`
   return `${currentPath}api/run`
 }
+
+function normalizeHeader(text) {
+  return text.trim().toLowerCase().replace(/[\s-]+/g, "_")
+}
+
+function parseCsvLine(line) {
+  const values = []
+  let current = ""
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i]
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"'
+        i += 1
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
+    }
+
+    if (char === "," && !inQuotes) {
+      values.push(current.trim())
+      current = ""
+      continue
+    }
+
+    current += char
+  }
+
+  values.push(current.trim())
+  return values
+}
+
+function parseNumber(raw) {
+  const cleaned = String(raw || "").replace(/,/g, "").trim()
+  const parsed = Number(cleaned)
+  if (Number.isNaN(parsed)) {
+    throw new Error(`Invalid numeric value: ${raw}`)
+  }
+  return parsed
+}
+
+function parseSettlementCsv(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length < 2) {
+    throw new Error("CSV must contain a header row and at least one data row")
+  }
+
+  const headers = parseCsvLine(lines[0]).map(normalizeHeader)
+  const requiredHeaders = ["participant", "total_outgoing_usd", "total_incoming_usd", "net_pst_usd"]
+
+  requiredHeaders.forEach((key) => {
+    if (!headers.includes(key)) {
+      throw new Error(`Missing required column: ${key}`)
+    }
+  })
+
+  const rows = lines.slice(1).map((line) => {
+    const values = parseCsvLine(line)
+    const record = {}
+
+    headers.forEach((header, index) => {
+      record[header] = values[index] || ""
+    })
+
+    return {
+      participant: record.participant,
+      totalOutgoingUsd: parseNumber(record.total_outgoing_usd),
+      totalIncomingUsd: parseNumber(record.total_incoming_usd),
+      netPstUsd: parseNumber(record.net_pst_usd),
+    }
+  })
+
+  if (!rows.length) {
+    throw new Error("No valid rows found in CSV")
+  }
+
+  const consolidated = rows.reduce(
+    (acc, row) => ({
+      participant: "ALL",
+      totalOutgoingUsd: acc.totalOutgoingUsd + row.totalOutgoingUsd,
+      totalIncomingUsd: acc.totalIncomingUsd + row.totalIncomingUsd,
+      netPstUsd: acc.netPstUsd + row.netPstUsd,
+    }),
+    { participant: "ALL", totalOutgoingUsd: 0, totalIncomingUsd: 0, netPstUsd: 0 },
+  )
+
+  return { rows, consolidated }
+}
+
+function formatAmount(amount) {
+  return Number(amount).toFixed(2).replace(/\.00$/, "")
+}
+
+function applyRowToForm(row, sourceLabel) {
+  setFieldValue("issueAmount", formatAmount(row.totalIncomingUsd))
+  setFieldValue("distributeAmount", formatAmount(row.totalOutgoingUsd))
+  setFieldValue("redeemAmount", formatAmount(Math.abs(row.netPstUsd)))
+
+  csvStatusEl.textContent = `${sourceLabel} applied. You can still edit values before running.`
+}
+
+function renderCsvPreview(data) {
+  const firstThree = data.rows.slice(0, 3)
+  const previewRows = firstThree
+    .map(
+      (row) =>
+        `${row.participant}: outgoing=${formatAmount(row.totalOutgoingUsd)}, incoming=${formatAmount(row.totalIncomingUsd)}, net=${formatAmount(row.netPstUsd)}`,
+    )
+    .join("\n")
+
+  csvPreviewEl.textContent = [
+    `Parsed rows: ${data.rows.length}`,
+    `Consolidated outgoing=${formatAmount(data.consolidated.totalOutgoingUsd)}, incoming=${formatAmount(data.consolidated.totalIncomingUsd)}, net=${formatAmount(data.consolidated.netPstUsd)}`,
+    previewRows ? `Sample:\n${previewRows}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+function rebuildParticipantSelect(data) {
+  participantSelect.innerHTML = ""
+
+  const allOption = document.createElement("option")
+  allOption.value = "__all__"
+  allOption.textContent = "All participants (consolidated)"
+  participantSelect.appendChild(allOption)
+
+  data.rows.forEach((row) => {
+    const option = document.createElement("option")
+    option.value = row.participant
+    option.textContent = row.participant
+    participantSelect.appendChild(option)
+  })
+
+  participantSelect.disabled = false
+  applyCsvBtn.disabled = false
+}
+
+function onApplyCsv() {
+  if (!parsedCsvData) {
+    csvStatusEl.textContent = "Upload and parse a CSV file first."
+    return
+  }
+
+  const selectedParticipant = participantSelect.value
+
+  if (selectedParticipant === "__all__") {
+    applyRowToForm(parsedCsvData.consolidated, "Consolidated totals")
+    return
+  }
+
+  const row = parsedCsvData.rows.find((item) => item.participant === selectedParticipant)
+  if (!row) {
+    csvStatusEl.textContent = `Participant not found: ${selectedParticipant}`
+    return
+  }
+
+  applyRowToForm(row, `Participant ${selectedParticipant}`)
+}
+
+csvFileInput.addEventListener("change", async () => {
+  const [file] = csvFileInput.files || []
+
+  if (!file) {
+    parsedCsvData = null
+    participantSelect.disabled = true
+    applyCsvBtn.disabled = true
+    csvStatusEl.textContent = ""
+    csvPreviewEl.textContent = ""
+    return
+  }
+
+  try {
+    const text = await file.text()
+    parsedCsvData = parseSettlementCsv(text)
+    rebuildParticipantSelect(parsedCsvData)
+    renderCsvPreview(parsedCsvData)
+    applyRowToForm(parsedCsvData.consolidated, "Consolidated totals")
+  } catch (error) {
+    parsedCsvData = null
+    participantSelect.disabled = true
+    applyCsvBtn.disabled = true
+    csvStatusEl.textContent = error.message
+    csvPreviewEl.textContent = ""
+  }
+})
+
+applyCsvBtn.addEventListener("click", onApplyCsv)
 
 function toQueryString(payload) {
   const params = new URLSearchParams()
@@ -60,6 +267,14 @@ runBtn.addEventListener("click", async () => {
     settlementCycleId: value("settlementCycleId"),
     issuanceAuthId: value("issuanceAuthId"),
     paymentInstructionId: value("paymentInstructionId"),
+    settlementApprovedAmount: value("settlementApprovedAmount"),
+    retryCount: value("retryCount"),
+    maxRetryAttempts: value("maxRetryAttempts"),
+    batchModeEnabled: value("batchModeEnabled"),
+    batchDays: value("batchDays"),
+    batchStartDate: value("batchStartDate"),
+    batchEndDate: value("batchEndDate"),
+    batchReferenceIds: value("batchReferenceIds"),
   }
 
   try {

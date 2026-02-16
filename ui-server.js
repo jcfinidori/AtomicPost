@@ -91,6 +91,14 @@ function buildOverrides(input) {
     SETTLEMENT_CYCLE_ID: input.settlementCycleId,
     ISSUANCE_AUTH_ID: input.issuanceAuthId,
     PAYMENT_INSTRUCTION_ID: input.paymentInstructionId,
+    SETTLEMENT_APPROVED_AMOUNT: input.settlementApprovedAmount,
+    RETRY_COUNT: input.retryCount,
+    MAX_RETRY_ATTEMPTS: input.maxRetryAttempts,
+    BATCH_MODE_ENABLED: input.batchModeEnabled,
+    BATCH_DAYS: input.batchDays,
+    BATCH_START_DATE: input.batchStartDate,
+    BATCH_END_DATE: input.batchEndDate,
+    BATCH_REFERENCE_IDS: input.batchReferenceIds,
   }
 }
 
@@ -150,6 +158,14 @@ const server = http.createServer(async (req, res) => {
         settlementCycleId: requestUrl.searchParams.get("settlementCycleId"),
         issuanceAuthId: requestUrl.searchParams.get("issuanceAuthId"),
         paymentInstructionId: requestUrl.searchParams.get("paymentInstructionId"),
+        settlementApprovedAmount: requestUrl.searchParams.get("settlementApprovedAmount"),
+        retryCount: requestUrl.searchParams.get("retryCount"),
+        maxRetryAttempts: requestUrl.searchParams.get("maxRetryAttempts"),
+        batchModeEnabled: requestUrl.searchParams.get("batchModeEnabled"),
+        batchDays: requestUrl.searchParams.get("batchDays"),
+        batchStartDate: requestUrl.searchParams.get("batchStartDate"),
+        batchEndDate: requestUrl.searchParams.get("batchEndDate"),
+        batchReferenceIds: requestUrl.searchParams.get("batchReferenceIds"),
       }
 
       const filteredOverrides = filterOverrides(buildOverrides(queryInput))

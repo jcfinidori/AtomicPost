@@ -7,7 +7,10 @@
   "scripts": {
     "poc": "node scripts/poc-stablecoin-xrpl.js",
     "check": "node --check scripts/poc-stablecoin-xrpl.js",
-    "ui": "node ui-server.js"
+    "server": "node ui-server.js",
+    "ui": "npm run server",
+    "start": "npm run server",
+    "dev": "npm run server"
   },
   "dependencies": {
     "xrpl": "^4.2.5"
