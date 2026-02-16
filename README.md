@@ -67,6 +67,9 @@ You can also upload a settlement CSV in the UI to auto-populate amounts:
 - Selecting a specific participant fills values for that row
 - Mapping used by the form: `issueAmount = total_incoming_usd`, `distributeAmount = total_outgoing_usd`, `redeemAmount = abs(net_pst_usd)`
 
+- The UI now groups controls (core, partial/retry, batch) and validates numeric/date inputs before running
+- A run summary panel parses stdout and highlights settlement status (`Reconciled`, `Partial_Settled_Pending_Retry`, `Exception`)
+
 If you see `JSON.parse` errors in the browser, update to the latest `public/app.js` and `ui-server.js` in this repo. The UI now handles non-JSON error responses and shows the raw server body for easier debugging.
 If Replit/proxy returns `405 Method Not Allowed` HTML on `POST /api/run`, the frontend now automatically retries with `GET /api/run?...` and expects JSON from the same backend.
 If your platform serves the app behind a path prefix, the frontend now builds the API URL from the current page path so `/api/run` requests still route correctly.

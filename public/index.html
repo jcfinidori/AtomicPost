@@ -6,26 +6,34 @@
     <title>XRPL Stablecoin PoC UI</title>
     <style>
       :root { color-scheme: light dark; }
-      body { font-family: Arial, sans-serif; margin: 2rem; max-width: 920px; }
+      body { font-family: Arial, sans-serif; margin: 2rem; max-width: 1100px; }
       h1 { margin-bottom: 0.5rem; }
+      h2 { margin: 0 0 0.4rem; font-size: 1rem; }
       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
       label { display: block; font-size: 0.9rem; margin-bottom: 4px; }
       input, select { width: 100%; padding: 8px; box-sizing: border-box; }
       button { margin-top: 1rem; padding: 10px 16px; cursor: pointer; }
       pre { white-space: pre-wrap; border: 1px solid #8885; border-radius: 6px; padding: 12px; min-height: 160px; }
       .muted { color: #666; }
       .section { margin-top: 1.2rem; }
-      .csv-box { border: 1px solid #8885; border-radius: 6px; padding: 12px; margin: 1rem 0; }
-      #csvStatus { min-height: 1.2rem; margin-top: 8px; }
-      #csvPreview { min-height: 64px; }
+      .panel { border: 1px solid #8885; border-radius: 8px; padding: 12px; margin: 1rem 0; }
+      .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .chip { border: 1px solid #8885; border-radius: 999px; padding: 4px 10px; font-size: 0.8rem; }
+      .chip.ok { border-color: #2f9e44; color: #2f9e44; }
+      .chip.warn { border-color: #e67700; color: #e67700; }
+      .chip.err { border-color: #c92a2a; color: #c92a2a; }
+      #runSummary { min-height: 80px; }
+      #uiStatus { min-height: 1.2rem; margin-top: 8px; }
+      .actions { display: flex; align-items: center; gap: 12px; }
     </style>
   </head>
   <body>
     <h1>XRPL Stablecoin PoC Runner</h1>
-    <p class="muted">Run the existing PoC script with custom parameters and view output.</p>
+    <p class="muted">Run the existing PoC script with settlement, batch, and governance controls.</p>
 
-    <div class="csv-box">
-      <h3>Import net settlement CSV</h3>
+    <div class="panel">
+      <h2>Import net settlement CSV</h2>
       <p class="muted">
         Expected headers: <code>participant</code>, <code>total_outgoing_usd</code>, <code>total_incoming_usd</code>,
         <code>net_pst_usd</code>.
@@ -47,74 +55,98 @@
       <pre id="csvPreview" class="muted"></pre>
     </div>
 
-    <div class="grid">
-      <div>
-        <label for="networkUrl">XRPL Network URL</label>
-        <input id="networkUrl" value="wss://s.altnet.rippletest.net:51233" />
-      </div>
-      <div>
-        <label for="currencyCode">Currency Code</label>
-        <input id="currencyCode" value="USD" />
-      </div>
-      <div>
-        <label for="issueAmount">Issue Amount</label>
-        <input id="issueAmount" value="1000" />
-      </div>
-      <div>
-        <label for="distributeAmount">Distribute Amount</label>
-        <input id="distributeAmount" value="250" />
-      </div>
-      <div>
-        <label for="redeemAmount">Redeem Amount</label>
-        <input id="redeemAmount" value="50" />
-      </div>
-      <div>
-        <label for="settlementCycleId">Settlement Cycle ID</label>
-        <input id="settlementCycleId" placeholder="CYCLE_2026-02-11" />
-      </div>
-      <div>
-        <label for="issuanceAuthId">Issuance Auth ID</label>
-        <input id="issuanceAuthId" placeholder="IA_POC_001" />
-      </div>
-      <div>
-        <label for="paymentInstructionId">Payment Instruction ID</label>
-        <input id="paymentInstructionId" placeholder="PI_POC_001" />
-      </div>
-      <div>
-        <label for="settlementApprovedAmount">Approved Settlement Amount (optional)</label>
-        <input id="settlementApprovedAmount" placeholder="e.g. 150" />
-      </div>
-      <div>
-        <label for="retryCount">Retry Count</label>
-        <input id="retryCount" value="0" />
-      </div>
-      <div>
-        <label for="maxRetryAttempts">Max Retry Attempts</label>
-        <input id="maxRetryAttempts" value="3" />
-      </div>
-      <div>
-        <label for="batchModeEnabled">Batch Mode Enabled</label>
-        <input id="batchModeEnabled" value="true" />
-      </div>
-      <div>
-        <label for="batchDays">Batch Days</label>
-        <input id="batchDays" value="1" />
-      </div>
-      <div>
-        <label for="batchStartDate">Batch Start Date (optional)</label>
-        <input id="batchStartDate" placeholder="YYYY-MM-DD" />
-      </div>
-      <div>
-        <label for="batchEndDate">Batch End Date (optional)</label>
-        <input id="batchEndDate" placeholder="YYYY-MM-DD" />
-      </div>
-      <div>
-        <label for="batchReferenceIds">Batch Reference IDs (optional)</label>
-        <input id="batchReferenceIds" placeholder="DAY_1,DAY_2" />
+    <div class="panel">
+      <h2>Core settlement input</h2>
+      <div class="grid">
+        <div>
+          <label for="networkUrl">XRPL Network URL</label>
+          <input id="networkUrl" value="wss://s.altnet.rippletest.net:51233" />
+        </div>
+        <div>
+          <label for="currencyCode">Currency Code</label>
+          <input id="currencyCode" value="USD" />
+        </div>
+        <div>
+          <label for="issueAmount">Issue Amount</label>
+          <input id="issueAmount" value="1000" />
+        </div>
+        <div>
+          <label for="distributeAmount">Daily Distribute Amount</label>
+          <input id="distributeAmount" value="250" />
+        </div>
+        <div>
+          <label for="redeemAmount">Redeem Amount</label>
+          <input id="redeemAmount" value="50" />
+        </div>
+        <div>
+          <label for="settlementCycleId">Settlement Cycle ID</label>
+          <input id="settlementCycleId" placeholder="CYCLE_2026-02-11" />
+        </div>
+        <div>
+          <label for="issuanceAuthId">Issuance/Auth ID</label>
+          <input id="issuanceAuthId" placeholder="IA_POC_001" />
+        </div>
+        <div>
+          <label for="paymentInstructionId">Payment Instruction ID</label>
+          <input id="paymentInstructionId" placeholder="PI_POC_001" />
+        </div>
       </div>
     </div>
 
-    <button id="runBtn">Run PoC</button>
+    <div class="panel">
+      <h2>Partial + retry controls</h2>
+      <div class="grid-3">
+        <div>
+          <label for="settlementApprovedAmount">Approved Settlement Amount (optional)</label>
+          <input id="settlementApprovedAmount" placeholder="e.g. 150" />
+        </div>
+        <div>
+          <label for="retryCount">Retry Count</label>
+          <input id="retryCount" value="0" />
+        </div>
+        <div>
+          <label for="maxRetryAttempts">Max Retry Attempts</label>
+          <input id="maxRetryAttempts" value="3" />
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Batch + multi-day controls</h2>
+      <div class="grid-3">
+        <div>
+          <label for="batchModeEnabled">Batch Mode Enabled</label>
+          <input id="batchModeEnabled" value="true" />
+        </div>
+        <div>
+          <label for="batchDays">Batch Days</label>
+          <input id="batchDays" value="1" />
+        </div>
+        <div>
+          <label for="batchStartDate">Batch Start Date (optional)</label>
+          <input id="batchStartDate" placeholder="YYYY-MM-DD" />
+        </div>
+        <div>
+          <label for="batchEndDate">Batch End Date (optional)</label>
+          <input id="batchEndDate" placeholder="YYYY-MM-DD" />
+        </div>
+        <div style="grid-column: span 2;">
+          <label for="batchReferenceIds">Batch Reference IDs (optional)</label>
+          <input id="batchReferenceIds" placeholder="DAY_1,DAY_2,DAY_3" />
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="runBtn">Run PoC</button>
+      <div id="uiStatus" class="muted"></div>
+    </div>
+
+    <div class="section panel">
+      <h2>Run summary</h2>
+      <div id="runSummary" class="muted">Run the PoC to see parsed status details here.</div>
+      <div id="runSummaryChips" class="chip-row"></div>
+    </div>
 
     <div class="section">
       <h3>Stdout</h3>

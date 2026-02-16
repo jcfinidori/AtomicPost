@@ -6,6 +6,9 @@ const participantSelect = document.getElementById("participantSelect")
 const applyCsvBtn = document.getElementById("applyCsvBtn")
 const csvStatusEl = document.getElementById("csvStatus")
 const csvPreviewEl = document.getElementById("csvPreview")
+const uiStatusEl = document.getElementById("uiStatus")
+const runSummaryEl = document.getElementById("runSummary")
+const runSummaryChipsEl = document.getElementById("runSummaryChips")
 
 let parsedCsvData = null
 
@@ -15,6 +18,97 @@ function value(id) {
 
 function setFieldValue(id, nextValue) {
   document.getElementById(id).value = nextValue
+}
+
+
+function parseBoolLike(value) {
+  const normalized = String(value || "").trim().toLowerCase()
+  if (["true", "1", "yes", "y"].includes(normalized)) {
+    return true
+  }
+  if (["false", "0", "no", "n"].includes(normalized)) {
+    return false
+  }
+  throw new Error(`batchModeEnabled must be true/false (got: ${value})`)
+}
+
+function ensureNonNegativeInteger(name, raw) {
+  if (raw === "") {
+    return
+  }
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative integer`)
+  }
+}
+
+function ensureNumeric(name, raw) {
+  if (raw === "") {
+    return
+  }
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative number`)
+  }
+}
+
+function ensureDate(name, raw) {
+  if (!raw) {
+    return
+  }
+  const iso = /^\d{4}-\d{2}-\d{2}$/
+  if (!iso.test(raw)) {
+    throw new Error(`${name} must use YYYY-MM-DD format`)
+  }
+}
+
+function validatePayload(payload) {
+  ensureNumeric("issueAmount", payload.issueAmount)
+  ensureNumeric("distributeAmount", payload.distributeAmount)
+  ensureNumeric("redeemAmount", payload.redeemAmount)
+  ensureNumeric("settlementApprovedAmount", payload.settlementApprovedAmount)
+  ensureNonNegativeInteger("retryCount", payload.retryCount)
+  ensureNonNegativeInteger("maxRetryAttempts", payload.maxRetryAttempts)
+  ensureNonNegativeInteger("batchDays", payload.batchDays)
+  ensureDate("batchStartDate", payload.batchStartDate)
+  ensureDate("batchEndDate", payload.batchEndDate)
+  parseBoolLike(payload.batchModeEnabled)
+}
+
+function summaryChip(label, variant) {
+  const chip = document.createElement("span")
+  chip.className = `chip ${variant}`
+  chip.textContent = label
+  return chip
+}
+
+function renderRunSummary(stdout, stderr) {
+  runSummaryChipsEl.innerHTML = ""
+
+  if (stderr && stderr.trim()) {
+    runSummaryEl.textContent = "Run finished with stderr output. Review details below."
+    runSummaryChipsEl.appendChild(summaryChip("stderr present", "warn"))
+    return
+  }
+
+  const statusMatch = stdout.match(/Settlement log written to\s+(.+?)\s+\(([^)]+)\)\./)
+  if (!statusMatch) {
+    runSummaryEl.textContent = "Run completed. Could not parse settlement status from stdout."
+    runSummaryChipsEl.appendChild(summaryChip("status unknown", "warn"))
+    return
+  }
+
+  const [, reconPath, status] = statusMatch
+  runSummaryEl.textContent = `Settlement artifact: ${reconPath}`
+
+  const normalized = String(status).toLowerCase()
+  const variant = normalized.includes("reconciled")
+    ? "ok"
+    : normalized.includes("partial")
+      ? "warn"
+      : "err"
+
+  runSummaryChipsEl.appendChild(summaryChip(`status: ${status}`, variant))
 }
 
 function apiRunPath() {
@@ -257,6 +351,9 @@ runBtn.addEventListener("click", async () => {
   runBtn.textContent = "Running..."
   stdoutEl.textContent = ""
   stderrEl.textContent = ""
+  uiStatusEl.textContent = ""
+  runSummaryEl.textContent = "Running..."
+  runSummaryChipsEl.innerHTML = ""
 
   const payload = {
     networkUrl: value("networkUrl"),
@@ -278,6 +375,7 @@ runBtn.addEventListener("click", async () => {
   }
 
   try {
+    validatePayload(payload)
     const response = await fetch(apiRunPath(), {
       method: "POST",
       headers: {
@@ -306,8 +404,13 @@ runBtn.addEventListener("click", async () => {
 
     stdoutEl.textContent = data.stdout || "(no stdout)"
     stderrEl.textContent = data.stderr || "(no stderr)"
+    uiStatusEl.textContent = "Run completed."
+    renderRunSummary(data.stdout || "", data.stderr || "")
   } catch (error) {
     stderrEl.textContent = error.message
+    runSummaryEl.textContent = "Run failed before completion."
+    runSummaryChipsEl.innerHTML = ""
+    runSummaryChipsEl.appendChild(summaryChip("run failed", "err"))
   } finally {
     runBtn.disabled = false
     runBtn.textContent = "Run PoC"
