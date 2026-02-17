@@ -81,6 +81,7 @@ function validatePayload(payload) {
   parseBoolLike(payload.operatorCEnabled)
   parseBoolLike(payload.requireAuthEnabled)
   parseBoolLike(payload.defaultRippleEnabled)
+  parseBoolLike(payload.trustlineAuthReportEnabled)
 }
 
 
@@ -98,6 +99,11 @@ function renderRunSummary(stdout, stderr) {
     runSummaryEl.textContent = "Run finished with stderr output. Review details below."
     runSummaryChipsEl.appendChild(summaryChip("stderr present", "warn"))
     return
+  }
+
+  const authReportMatch = stdout.match(/Trustline authorization report written to\s+(.+?)\./)
+  if (authReportMatch) {
+    runSummaryChipsEl.appendChild(summaryChip("auth report written", "ok"))
   }
 
   const multiCycleMatch = stdout.match(/Multi-cycle simulation completed: (\d+) cycles, (\d+) failed/)
@@ -415,6 +421,8 @@ runBtn.addEventListener("click", async () => {
     operatorCEnabled: value("operatorCEnabled"),
     requireAuthEnabled: value("requireAuthEnabled"),
     defaultRippleEnabled: value("defaultRippleEnabled"),
+    trustlineAuthReportEnabled: value("trustlineAuthReportEnabled"),
+    trustlineAuthReportPath: value("trustlineAuthReportPath"),
     reconOutputPath: value("reconOutputPath"),
   }
 

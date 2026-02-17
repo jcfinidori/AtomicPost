@@ -26,6 +26,8 @@ const OPERATOR_B_SHARE = process.env.OPERATOR_B_SHARE || "0.6"
 const OPERATOR_C_ENABLED = String(process.env.OPERATOR_C_ENABLED || "true").toLowerCase() !== "false"
 const REQUIRE_AUTH_ENABLED = String(process.env.REQUIRE_AUTH_ENABLED || "true").toLowerCase() !== "false"
 const DEFAULT_RIPPLE_ENABLED = String(process.env.DEFAULT_RIPPLE_ENABLED || "false").toLowerCase() !== "false"
+const TRUSTLINE_AUTH_REPORT_ENABLED = String(process.env.TRUSTLINE_AUTH_REPORT_ENABLED || "true").toLowerCase() !== "false"
+const TRUSTLINE_AUTH_REPORT_PATH = process.env.TRUSTLINE_AUTH_REPORT_PATH || "artifacts/trustline-auth-report.json"
 const RECON_OUTPUT_PATH = process.env.RECON_OUTPUT_PATH || "artifacts/settlement-log.json"
 
 const MEMO_SCHEMA_KEYS = Object.freeze([
@@ -683,6 +685,14 @@ async function persistSettlementLog(settlementLog) {
   return outputPath
 }
 
+async function persistTrustlineAuthorizationReport(report) {
+  const outputPath = path.resolve(TRUSTLINE_AUTH_REPORT_PATH)
+  await fs.mkdir(path.dirname(outputPath), { recursive: true })
+  await fs.writeFile(outputPath, `${JSON.stringify(report, null, 2)}
+`, "utf8")
+  return outputPath
+}
+
 async function setIssuerFlags(client, issuerWallet) {
   const flagTxs = []
 
@@ -759,16 +769,34 @@ async function main() {
     await trustSet(client, treasury.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     await trustSet(client, operatorA.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     await trustSet(client, operatorB.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+
+    const trustlineAuthorizationRecords = []
     if (operatorC) {
       await trustSet(client, operatorC.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     }
 
     if (REQUIRE_AUTH_ENABLED) {
-      await authorizeTrustline(client, issuer.wallet, treasury.wallet.classicAddress, CURRENCY_CODE)
-      await authorizeTrustline(client, issuer.wallet, operatorA.wallet.classicAddress, CURRENCY_CODE)
-      await authorizeTrustline(client, issuer.wallet, operatorB.wallet.classicAddress, CURRENCY_CODE)
+      trustlineAuthorizationRecords.push({
+        holderRole: "Treasury",
+        holderAddress: treasury.wallet.classicAddress,
+        authorizationTx: await authorizeTrustline(client, issuer.wallet, treasury.wallet.classicAddress, CURRENCY_CODE),
+      })
+      trustlineAuthorizationRecords.push({
+        holderRole: "OperatorA",
+        holderAddress: operatorA.wallet.classicAddress,
+        authorizationTx: await authorizeTrustline(client, issuer.wallet, operatorA.wallet.classicAddress, CURRENCY_CODE),
+      })
+      trustlineAuthorizationRecords.push({
+        holderRole: "OperatorB",
+        holderAddress: operatorB.wallet.classicAddress,
+        authorizationTx: await authorizeTrustline(client, issuer.wallet, operatorB.wallet.classicAddress, CURRENCY_CODE),
+      })
       if (operatorC) {
-        await authorizeTrustline(client, issuer.wallet, operatorC.wallet.classicAddress, CURRENCY_CODE)
+        trustlineAuthorizationRecords.push({
+          holderRole: "OperatorC",
+          holderAddress: operatorC.wallet.classicAddress,
+          authorizationTx: await authorizeTrustline(client, issuer.wallet, operatorC.wallet.classicAddress, CURRENCY_CODE),
+        })
       }
       console.log(`Trust lines authorized by issuer for ${CURRENCY_CODE}.`)
     }
@@ -908,6 +936,41 @@ async function main() {
 
     const settlementActualTotal = parseAmount(readIssuedCurrencyValue(settlementResultB)) + parseAmount(readIssuedCurrencyValue(settlementResultC))
 
+    let trustlineAuthorizationReport = {
+      enabled: TRUSTLINE_AUTH_REPORT_ENABLED,
+      requireAuthEnabled: REQUIRE_AUTH_ENABLED,
+      generatedAt: new Date().toISOString(),
+      currency: CURRENCY_CODE,
+      issuer: issuer.wallet.classicAddress,
+      entries: [],
+      persistedPath: null,
+    }
+
+    if (TRUSTLINE_AUTH_REPORT_ENABLED) {
+      const entries = []
+      for (const record of trustlineAuthorizationRecords) {
+        const line = await findTrustline(client, record.holderAddress, issuer.wallet.classicAddress, CURRENCY_CODE)
+        entries.push({
+          holderRole: record.holderRole,
+          holderAddress: record.holderAddress,
+          trustlineExists: Boolean(line),
+          trustlineLimit: line ? line.limit : null,
+          trustlineBalance: line ? line.balance : null,
+          issuerAuthorized: line ? line.authorized === true : false,
+          authorizationTxHash: txHash(record.authorizationTx),
+          authorizationResultCode: txResultCode(record.authorizationTx),
+        })
+      }
+      trustlineAuthorizationReport.entries = entries
+      trustlineAuthorizationReport.summary = {
+        totalEntries: entries.length,
+        authorizedEntries: entries.filter((entry) => entry.issuerAuthorized).length,
+        missingAuthEntries: entries.filter((entry) => !entry.issuerAuthorized).map((entry) => entry.holderRole),
+      }
+      trustlineAuthorizationReport.persistedPath = await persistTrustlineAuthorizationReport(trustlineAuthorizationReport)
+      console.log(`Trustline authorization report written to ${trustlineAuthorizationReport.persistedPath}.`)
+    }
+
     const settlementLog = {
       canonicalIds: {
         CycleID: SETTLEMENT_CYCLE_ID,
@@ -940,6 +1003,7 @@ async function main() {
         },
         redemption: redemptionTrustlineCheck,
       },
+      trustlineAuthorizationReport,
       settlementPlan,
       batch: settlementPlan.batch,
       retry: settlementPlan.retry,

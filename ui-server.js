@@ -145,6 +145,8 @@ function buildOverrides(input) {
     OPERATOR_C_ENABLED: input.operatorCEnabled,
     REQUIRE_AUTH_ENABLED: input.requireAuthEnabled,
     DEFAULT_RIPPLE_ENABLED: input.defaultRippleEnabled,
+    TRUSTLINE_AUTH_REPORT_ENABLED: input.trustlineAuthReportEnabled,
+    TRUSTLINE_AUTH_REPORT_PATH: input.trustlineAuthReportPath,
     RECON_OUTPUT_PATH: input.reconOutputPath,
   }
 }
@@ -229,6 +231,8 @@ const server = http.createServer(async (req, res) => {
         operatorCEnabled: requestUrl.searchParams.get("operatorCEnabled"),
         requireAuthEnabled: requestUrl.searchParams.get("requireAuthEnabled"),
         defaultRippleEnabled: requestUrl.searchParams.get("defaultRippleEnabled"),
+        trustlineAuthReportEnabled: requestUrl.searchParams.get("trustlineAuthReportEnabled"),
+        trustlineAuthReportPath: requestUrl.searchParams.get("trustlineAuthReportPath"),
         reconOutputPath: requestUrl.searchParams.get("reconOutputPath"),
       }
 

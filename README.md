@@ -100,6 +100,8 @@ Optional environment variables:
 - `OPERATOR_C_ENABLED` (`true`/`false`, default: `true`; set `false` for a 2-operator settlement cohort)
 - `REQUIRE_AUTH_ENABLED` (`true`/`false`, default: `true`)
 - `DEFAULT_RIPPLE_ENABLED` (`true`/`false`, default: `false`)
+- `TRUSTLINE_AUTH_REPORT_ENABLED` (`true`/`false`, default: `true`)
+- `TRUSTLINE_AUTH_REPORT_PATH` (default: `artifacts/trustline-auth-report.json`)
 - `RECON_OUTPUT_PATH` (default: `artifacts/settlement-log.json`)
 
 
@@ -140,6 +142,7 @@ Trustline governance checks (PoC-safe implementation):
 - Checks validate trustline existence, destination trustline headroom, and sender balance sufficiency
 - On failure (when enforcement enabled), the PoC blocks payment and returns an explicit governance error
 - Successful runs store trustline check evidence in the reconciliation artifact (`trustlineGovernance`)
+- Optional auditor artifact: trustline authorization workflow report (`trustline-auth-report.json`) with per-operator authorization tx hash/result and post-authorization trustline state
 
 Three-operator settlement flow (A/B/C):
 - Treasury funds Operator B and Operator C based on a deterministic share split of the net settlement amount
