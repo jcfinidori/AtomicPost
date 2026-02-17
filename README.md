@@ -68,6 +68,7 @@ You can also upload a settlement CSV in the UI to auto-populate amounts:
 - Selecting **All participants (consolidated)** fills totals across rows
 - Selecting a specific participant fills values for that row
 - Mapping used by the form: `issueAmount = total_incoming_usd`, `distributeAmount = total_outgoing_usd`, `redeemAmount = abs(net_pst_usd)`
+- Enable **Run all CSV rows as multi-cycle simulation in one run** to execute one PoC run request that iterates every CSV row as a settlement cycle (`<baseCycleId>_R1`, `<baseCycleId>_R2`, ...).
 
 - The UI now groups controls (core, partial/retry, batch) and validates numeric/date inputs before running
 - A run summary panel parses stdout and highlights settlement status (`Reconciled`, `Partial_Settled_Pending_Retry`, `Exception`)

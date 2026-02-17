@@ -81,6 +81,43 @@ function runPoc(overrides) {
 }
 
 
+
+async function runMultiCycle(baseOverrides, csvCycles) {
+  const results = []
+  for (let index = 0; index < csvCycles.length; index += 1) {
+    const cycle = csvCycles[index]
+    const cycleOverrides = filterOverrides({
+      ...baseOverrides,
+      ISSUE_AMOUNT: cycle.issueAmount,
+      DISTRIBUTE_AMOUNT: cycle.distributeAmount,
+      REDEEM_AMOUNT: cycle.redeemAmount,
+      SETTLEMENT_CYCLE_ID: cycle.settlementCycleId,
+    })
+
+    const result = await runPoc(cycleOverrides)
+    results.push({ index: index + 1, participant: cycle.participant || `ROW_${index + 1}`, ...result, settlementCycleId: cycle.settlementCycleId })
+  }
+
+  const failed = results.filter((item) => item.code !== 0).length
+  const stdout = [
+    `Multi-cycle simulation completed: ${results.length} cycles, ${failed} failed`,
+    ...results.map((item) => `\n--- Cycle ${item.index} (${item.participant}) [${item.settlementCycleId}] code=${item.code} ---\n${item.stdout || ""}`),
+  ].join("\n")
+
+  const stderr = results
+    .filter((item) => item.stderr && item.stderr.trim())
+    .map((item) => `\n--- Cycle ${item.index} (${item.participant}) stderr ---\n${item.stderr}`)
+    .join("\n")
+
+  return {
+    code: failed > 0 ? 1 : 0,
+    stdout,
+    stderr,
+    multiCycle: true,
+    cycles: results,
+  }
+}
+
 function buildOverrides(input) {
   return {
     XRPL_NETWORK_URL: input.networkUrl,
@@ -148,6 +185,13 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await parseRequestBody(req)
       const filteredOverrides = filterOverrides(buildOverrides(body))
+
+      if (Array.isArray(body.csvCycles) && body.csvCycles.length > 0) {
+        const result = await runMultiCycle(filteredOverrides, body.csvCycles)
+        sendJson(res, 200, result)
+        return
+      }
+
       const result = await runPoc(filteredOverrides)
       sendJson(res, 200, result)
     } catch (error) {

@@ -9,6 +9,7 @@ const csvPreviewEl = document.getElementById("csvPreview")
 const uiStatusEl = document.getElementById("uiStatus")
 const runSummaryEl = document.getElementById("runSummary")
 const runSummaryChipsEl = document.getElementById("runSummaryChips")
+const runAllCsvCyclesEl = document.getElementById("runAllCsvCycles")
 
 let parsedCsvData = null
 
@@ -96,6 +97,15 @@ function renderRunSummary(stdout, stderr) {
   if (stderr && stderr.trim()) {
     runSummaryEl.textContent = "Run finished with stderr output. Review details below."
     runSummaryChipsEl.appendChild(summaryChip("stderr present", "warn"))
+    return
+  }
+
+  const multiCycleMatch = stdout.match(/Multi-cycle simulation completed: (\d+) cycles, (\d+) failed/)
+  if (multiCycleMatch) {
+    runSummaryEl.textContent = `Multi-cycle run complete: ${multiCycleMatch[1]} cycles`
+    const failed = Number(multiCycleMatch[2])
+    runSummaryChipsEl.appendChild(summaryChip(`cycles: ${multiCycleMatch[1]}`, "ok"))
+    runSummaryChipsEl.appendChild(summaryChip(`failed: ${failed}`, failed > 0 ? "err" : "ok"))
     return
   }
 
@@ -332,6 +342,22 @@ function toQueryString(payload) {
   return params.toString()
 }
 
+
+function buildCsvCycles(baseCycleId) {
+  if (!parsedCsvData) {
+    return []
+  }
+
+  const base = baseCycleId || `CYCLE_${new Date().toISOString().slice(0, 10)}`
+  return parsedCsvData.rows.map((row, index) => ({
+    participant: row.participant,
+    settlementCycleId: `${base}_R${index + 1}`,
+    issueAmount: formatAmount(row.totalIncomingUsd),
+    distributeAmount: formatAmount(row.totalOutgoingUsd),
+    redeemAmount: formatAmount(Math.abs(row.netPstUsd)),
+  }))
+}
+
 async function runViaGetFallback(payload) {
   const qs = toQueryString(payload)
   const response = await fetch(`${apiRunPath()}?${qs}`, {
@@ -393,6 +419,14 @@ runBtn.addEventListener("click", async () => {
   }
 
   try {
+    if (runAllCsvCyclesEl.checked) {
+      const cycles = buildCsvCycles(payload.settlementCycleId)
+      if (!cycles.length) {
+        throw new Error("Enable multi-cycle only after uploading a CSV with rows")
+      }
+      payload.csvCycles = cycles
+    }
+
     validatePayload(payload)
     const response = await fetch(apiRunPath(), {
       method: "POST",
@@ -410,6 +444,9 @@ runBtn.addEventListener("click", async () => {
       data = rawBody ? JSON.parse(rawBody) : {}
     } catch {
       if (response.status === 405) {
+        if (payload.csvCycles) {
+          throw new Error("Multi-cycle mode requires POST /api/run support; GET fallback is not available")
+        }
         data = await runViaGetFallback(payload)
       } else {
         throw new Error(`Server returned non-JSON response (status ${response.status}): ${rawBody.slice(0, 300)}`)
