@@ -3,7 +3,7 @@ const fs = require("fs/promises")
 const path = require("path")
 
 const NETWORK_URL = process.env.XRPL_NETWORK_URL || "wss://s.altnet.rippletest.net:51233"
-const CURRENCY_CODE = process.env.CURRENCY_CODE || "USD"
+const CURRENCY_CODE = process.env.CURRENCY_CODE || "USDS"
 const ISSUE_AMOUNT = process.env.ISSUE_AMOUNT || "1000"
 const DISTRIBUTE_AMOUNT = process.env.DISTRIBUTE_AMOUNT || "250"
 const REDEEM_AMOUNT = process.env.REDEEM_AMOUNT || "50"

@@ -29,7 +29,7 @@ function parseBoolLike(value) {
   if (["false", "0", "no", "n"].includes(normalized)) {
     return false
   }
-  throw new Error(`batchModeEnabled must be true/false (got: ${value})`)
+  throw new Error(`Expected true/false value (got: ${value})`)
 }
 
 function ensureNonNegativeInteger(name, raw) {
@@ -73,7 +73,12 @@ function validatePayload(payload) {
   ensureDate("batchStartDate", payload.batchStartDate)
   ensureDate("batchEndDate", payload.batchEndDate)
   parseBoolLike(payload.batchModeEnabled)
+  parseBoolLike(payload.partialSettlementEnabled)
+  parseBoolLike(payload.trustlineGovernanceEnforced)
+  ensureNonNegativeInteger("retryIntervalCycles", payload.retryIntervalCycles)
+  ensureNumeric("operatorBShare", payload.operatorBShare)
 }
+
 
 function summaryChip(label, variant) {
   const chip = document.createElement("span")
@@ -362,16 +367,23 @@ runBtn.addEventListener("click", async () => {
     distributeAmount: value("distributeAmount"),
     redeemAmount: value("redeemAmount"),
     settlementCycleId: value("settlementCycleId"),
+    approvalId: value("approvalId"),
     issuanceAuthId: value("issuanceAuthId"),
     paymentInstructionId: value("paymentInstructionId"),
+    batchId: value("batchId"),
     settlementApprovedAmount: value("settlementApprovedAmount"),
     retryCount: value("retryCount"),
     maxRetryAttempts: value("maxRetryAttempts"),
+    partialSettlementEnabled: value("partialSettlementEnabled"),
+    retryIntervalCycles: value("retryIntervalCycles"),
+    trustlineGovernanceEnforced: value("trustlineGovernanceEnforced"),
     batchModeEnabled: value("batchModeEnabled"),
     batchDays: value("batchDays"),
     batchStartDate: value("batchStartDate"),
     batchEndDate: value("batchEndDate"),
     batchReferenceIds: value("batchReferenceIds"),
+    operatorBShare: value("operatorBShare"),
+    reconOutputPath: value("reconOutputPath"),
   }
 
   try {

@@ -64,7 +64,7 @@
         </div>
         <div>
           <label for="currencyCode">Currency Code</label>
-          <input id="currencyCode" value="USD" />
+          <input id="currencyCode" value="USDS" />
         </div>
         <div>
           <label for="issueAmount">Issue Amount</label>
@@ -83,8 +83,16 @@
           <input id="settlementCycleId" placeholder="CYCLE_2026-02-11" />
         </div>
         <div>
-          <label for="issuanceAuthId">Issuance/Auth ID</label>
+          <label for="approvalId">Approval ID</label>
+          <input id="approvalId" placeholder="APP_POC_001" />
+        </div>
+        <div>
+          <label for="issuanceAuthId">Issuance/Auth ID (legacy alias)</label>
           <input id="issuanceAuthId" placeholder="IA_POC_001" />
+        </div>
+        <div>
+          <label for="batchId">Batch ID</label>
+          <input id="batchId" placeholder="BATCH_001" />
         </div>
         <div>
           <label for="paymentInstructionId">Payment Instruction ID</label>
@@ -94,7 +102,7 @@
     </div>
 
     <div class="panel">
-      <h2>Partial + retry controls</h2>
+      <h2>Partial + retry + governance controls</h2>
       <div class="grid-3">
         <div>
           <label for="settlementApprovedAmount">Approved Settlement Amount (optional)</label>
@@ -108,11 +116,23 @@
           <label for="maxRetryAttempts">Max Retry Attempts</label>
           <input id="maxRetryAttempts" value="3" />
         </div>
+        <div>
+          <label for="partialSettlementEnabled">Partial Settlement Enabled</label>
+          <input id="partialSettlementEnabled" value="true" />
+        </div>
+        <div>
+          <label for="retryIntervalCycles">Retry Interval Cycles</label>
+          <input id="retryIntervalCycles" value="1" />
+        </div>
+        <div>
+          <label for="trustlineGovernanceEnforced">Trustline Governance Enforced</label>
+          <input id="trustlineGovernanceEnforced" value="true" />
+        </div>
       </div>
     </div>
 
     <div class="panel">
-      <h2>Batch + multi-day controls</h2>
+      <h2>Batch + operator split controls</h2>
       <div class="grid-3">
         <div>
           <label for="batchModeEnabled">Batch Mode Enabled</label>
@@ -133,6 +153,14 @@
         <div style="grid-column: span 2;">
           <label for="batchReferenceIds">Batch Reference IDs (optional)</label>
           <input id="batchReferenceIds" placeholder="DAY_1,DAY_2,DAY_3" />
+        </div>
+        <div>
+          <label for="operatorBShare">Operator B Share (0-1)</label>
+          <input id="operatorBShare" value="0.6" />
+        </div>
+        <div style="grid-column: span 2;">
+          <label for="reconOutputPath">Reconciliation Output Path</label>
+          <input id="reconOutputPath" value="artifacts/settlement-log.json" />
         </div>
       </div>
     </div>

@@ -12,7 +12,7 @@ This repository contains a minimal proof-of-concept flow for launching a fiat-ba
   - **Operator C** (net debtor in PoC settlement)
 - Configuring issuer account flags suitable for a managed token setup.
 - Establishing trust lines from treasury and operators (A/B/C) to the issuer.
-- Issuing a USD-denominated IOU token (`USD`) to treasury.
+- Issuing a USD Settlement Token (`USDS`) IOU to treasury.
 - Funding net-debtor operators (B and C) from treasury for settlement execution.
 - Settling net obligations on-ledger from operators B/C to operator A.
 - Optionally redeeming operator A balance back to issuer.
@@ -148,11 +148,11 @@ Expected flow:
 1. Connect to testnet.
 2. Fund issuer, treasury, and operators A/B/C wallets from faucet.
 3. Set issuer flags.
-4. Add trust lines from treasury and operators A/B/C to issuer for `USD`.
-5. Issue `1000 USD` from issuer to treasury.
+4. Add trust lines from treasury and operators A/B/C to issuer for `USDS`.
+5. Issue `1000 USDS` from issuer to treasury.
 6. Fund Operator B and Operator C from treasury for settlement execution.
 7. Execute two on-ledger net settlements: Operator B -> Operator A and Operator C -> Operator A.
-8. Redeem `50 USD` from Operator A back to issuer.
+8. Redeem `50 USDS` from Operator A back to issuer.
 9. Print resulting balances and reserve details.
 10. Write a reconciliation artifact (`artifacts/settlement-log.json`) with transaction hashes and status.
 
@@ -167,6 +167,14 @@ Notes:
 - Replit runs `npm run server` by default via `.replit`.
 - The server uses `process.env.PORT`, so it works with Replit webview routing.
 - If `POST /api/run` is blocked by a proxy, the frontend falls back to `GET /api/run?...`.
+
+## Alignment with the Postal Operator PoC plan
+
+- Current implementation is fixed at a 3-operator settlement cohort (A/B/C), which fits the pilot range and can be extended to 5 in a follow-up iteration.
+- Trust lines are required before issuance/settlement/redemption and are preflight-checked by governance controls.
+- Settlement is executed as a deterministic batch of on-ledger `Payment` transactions with canonical memo fields for auditability.
+- Redemption is modeled as operator-to-issuer token return; off-ledger fiat release is intentionally out of scope for this repo.
+- Multi-signature, Escrow, and Hooks are not enabled in this PoC and remain optional enhancements for post-pilot hardening.
 
 ## Important production notes
 
