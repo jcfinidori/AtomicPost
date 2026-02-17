@@ -23,6 +23,9 @@ const BATCH_END_DATE = process.env.BATCH_END_DATE
 const BATCH_REFERENCE_IDS = process.env.BATCH_REFERENCE_IDS || ""
 const TRUSTLINE_GOVERNANCE_ENFORCED = String(process.env.TRUSTLINE_GOVERNANCE_ENFORCED || "true").toLowerCase() !== "false"
 const OPERATOR_B_SHARE = process.env.OPERATOR_B_SHARE || "0.6"
+const OPERATOR_C_ENABLED = String(process.env.OPERATOR_C_ENABLED || "true").toLowerCase() !== "false"
+const REQUIRE_AUTH_ENABLED = String(process.env.REQUIRE_AUTH_ENABLED || "true").toLowerCase() !== "false"
+const DEFAULT_RIPPLE_ENABLED = String(process.env.DEFAULT_RIPPLE_ENABLED || "false").toLowerCase() !== "false"
 const RECON_OUTPUT_PATH = process.env.RECON_OUTPUT_PATH || "artifacts/settlement-log.json"
 
 const MEMO_SCHEMA_KEYS = Object.freeze([
@@ -397,6 +400,18 @@ function buildSettlementPlan() {
 
 function buildOperatorSettlementPlan(instructedSettlementAmount) {
   const total = asPositiveNumber("instructedSettlement", instructedSettlementAmount)
+
+  if (!OPERATOR_C_ENABLED) {
+    return {
+      operatorCEnabled: false,
+      operatorBShare: 1,
+      operatorCShare: 0,
+      operatorBAmount: normalizeAmount(total),
+      operatorCAmount: normalizeAmount(0),
+      totalAmount: normalizeAmount(total),
+    }
+  }
+
   const operatorBShare = asPositiveNumber("OPERATOR_B_SHARE", OPERATOR_B_SHARE)
   if (operatorBShare > 1) {
     throw new Error(`OPERATOR_B_SHARE must be between 0 and 1, got: ${OPERATOR_B_SHARE}`)
@@ -406,6 +421,7 @@ function buildOperatorSettlementPlan(instructedSettlementAmount) {
   const operatorCAmount = Number((total - operatorBAmount).toFixed(6))
 
   return {
+    operatorCEnabled: true,
     operatorBShare,
     operatorCShare: Number((1 - operatorBShare).toFixed(6)),
     operatorBAmount: normalizeAmount(operatorBAmount),
@@ -429,6 +445,27 @@ async function trustSet(client, wallet, issuer, currency, limit = "1000000") {
   if (code !== "tesSUCCESS") {
     throw new Error(`TrustSet failed for ${wallet.classicAddress}: ${code}`)
   }
+}
+
+async function authorizeTrustline(client, issuerWallet, holderAddress, currency) {
+  const tx = {
+    TransactionType: "TrustSet",
+    Account: issuerWallet.classicAddress,
+    LimitAmount: {
+      issuer: holderAddress,
+      currency,
+      value: "0",
+    },
+    Flags: xrpl.TrustSetFlags.tfSetfAuth,
+  }
+
+  const result = await submitAndWait(client, issuerWallet, tx)
+  const code = txResultCode(result)
+  if (code !== "tesSUCCESS") {
+    throw new Error(`Trustline authorization failed for ${holderAddress}: ${code}`)
+  }
+
+  return result
 }
 
 async function paymentWithMemo(client, sender, destination, amount, memoFields) {
@@ -476,18 +513,19 @@ function buildCheck(name, pass, reasonCode, expected, observed, details) {
 
 function summarizeSettlementLog(settlementLog) {
   const checks = []
+  const operatorCEnabled = Boolean(settlementLog.operatorSettlementPlan?.operatorCEnabled)
 
-  const settlementHashes = [
+  const settlementHashes = operatorCEnabled ? [
     settlementLog.transactions.settlement.operatorBToA,
     settlementLog.transactions.settlement.operatorCToA,
-  ]
+  ] : [settlementLog.transactions.settlement.operatorBToA]
 
   checks.push(
     buildCheck(
       "tx_hashes_present",
       settlementHashes.every((hash) => hash !== "UNKNOWN_HASH"),
       EXCEPTION_CODES.MISSING_TX_HASH,
-      "2 settlement hashes",
+      operatorCEnabled ? "2 settlement hashes" : "1 settlement hash",
       settlementHashes,
     ),
   )
@@ -513,42 +551,43 @@ function summarizeSettlementLog(settlementLog) {
       "counterparties_match",
       settlementDetailB.account === settlementLog.participants.operatorB
         && settlementDetailB.destination === settlementLog.participants.operatorA
-        && settlementDetailC.account === settlementLog.participants.operatorC
-        && settlementDetailC.destination === settlementLog.participants.operatorA,
+        && (!operatorCEnabled
+          || (settlementDetailC.account === settlementLog.participants.operatorC
+            && settlementDetailC.destination === settlementLog.participants.operatorA)),
       EXCEPTION_CODES.COUNTERPARTY_MISMATCH,
       {
         operatorBToA: { account: settlementLog.participants.operatorB, destination: settlementLog.participants.operatorA },
-        operatorCToA: { account: settlementLog.participants.operatorC, destination: settlementLog.participants.operatorA },
+        ...(operatorCEnabled ? { operatorCToA: { account: settlementLog.participants.operatorC, destination: settlementLog.participants.operatorA } } : {}),
       },
       {
         operatorBToA: { account: settlementDetailB.account, destination: settlementDetailB.destination },
-        operatorCToA: { account: settlementDetailC.account, destination: settlementDetailC.destination },
+        ...(operatorCEnabled ? { operatorCToA: { account: settlementDetailC.account, destination: settlementDetailC.destination } } : {}),
       },
     ),
   )
 
   const memoComparisonB = memoSchemaMatches(
     createCanonicalMemoFields(`${PAYMENT_INSTRUCTION_ID}_B`, settlementLog.settlementPlan.partialFlag),
-    settlementLog.memos.settlement.operatorBToA,
+    settlementLog.memos.settlement.operatorBToA || {},
   )
   const memoComparisonC = memoSchemaMatches(
     createCanonicalMemoFields(`${PAYMENT_INSTRUCTION_ID}_C`, settlementLog.settlementPlan.partialFlag),
-    settlementLog.memos.settlement.operatorCToA,
+    settlementLog.memos.settlement.operatorCToA || {},
   )
 
   checks.push(
     buildCheck(
       "memo_schema_match",
-      memoComparisonB.pass && memoComparisonC.pass,
+      memoComparisonB.pass && (!operatorCEnabled || memoComparisonC.pass),
       EXCEPTION_CODES.MEMO_MISSING_OR_INVALID,
       MEMO_SCHEMA_KEYS,
       {
-        operatorBToA: MEMO_SCHEMA_KEYS.filter((key) => key in settlementLog.memos.settlement.operatorBToA),
-        operatorCToA: MEMO_SCHEMA_KEYS.filter((key) => key in settlementLog.memos.settlement.operatorCToA),
+        operatorBToA: MEMO_SCHEMA_KEYS.filter((key) => key in (settlementLog.memos.settlement.operatorBToA || {})),
+        ...(operatorCEnabled ? { operatorCToA: MEMO_SCHEMA_KEYS.filter((key) => key in (settlementLog.memos.settlement.operatorCToA || {})) } : {}),
       },
       {
         operatorBToA: memoComparisonB.mismatches,
-        operatorCToA: memoComparisonC.mismatches,
+        ...(operatorCEnabled ? { operatorCToA: memoComparisonC.mismatches } : {}),
       },
     ),
   )
@@ -556,13 +595,13 @@ function summarizeSettlementLog(settlementLog) {
   checks.push(
     buildCheck(
       "partial_flag_consistency",
-      settlementLog.memos.settlement.operatorBToA.PartialFlag === settlementLog.settlementPlan.partialFlag
-        && settlementLog.memos.settlement.operatorCToA.PartialFlag === settlementLog.settlementPlan.partialFlag,
+      (settlementLog.memos.settlement.operatorBToA || {}).PartialFlag === settlementLog.settlementPlan.partialFlag
+        && (!operatorCEnabled || (settlementLog.memos.settlement.operatorCToA || {}).PartialFlag === settlementLog.settlementPlan.partialFlag),
       EXCEPTION_CODES.PARTIAL_PAYMENT,
       settlementLog.settlementPlan.partialFlag,
       {
-        operatorBToA: settlementLog.memos.settlement.operatorBToA.PartialFlag,
-        operatorCToA: settlementLog.memos.settlement.operatorCToA.PartialFlag,
+        operatorBToA: (settlementLog.memos.settlement.operatorBToA || {}).PartialFlag,
+        ...(operatorCEnabled ? { operatorCToA: (settlementLog.memos.settlement.operatorCToA || {}).PartialFlag } : {}),
       },
     ),
   )
@@ -570,12 +609,12 @@ function summarizeSettlementLog(settlementLog) {
   checks.push(
     buildCheck(
       "ledger_result_success",
-      settlementDetailB.resultCode === "tesSUCCESS" && settlementDetailC.resultCode === "tesSUCCESS",
+      settlementDetailB.resultCode === "tesSUCCESS" && (!operatorCEnabled || settlementDetailC.resultCode === "tesSUCCESS"),
       EXCEPTION_CODES.STATUS_NOT_SUCCESS,
-      "tesSUCCESS for both settlement tx",
+      operatorCEnabled ? "tesSUCCESS for both settlement tx" : "tesSUCCESS for settlement tx",
       {
         operatorBToA: settlementDetailB.resultCode,
-        operatorCToA: settlementDetailC.resultCode,
+        ...(operatorCEnabled ? { operatorCToA: settlementDetailC.resultCode } : {}),
       },
     ),
   )
@@ -594,23 +633,23 @@ function summarizeSettlementLog(settlementLog) {
     buildCheck(
       "trustline_governance_precheck",
       settlementLog.trustlineGovernance.settlement.operatorBToA.pass
-        && settlementLog.trustlineGovernance.settlement.operatorCToA.pass,
+        && (!operatorCEnabled || settlementLog.trustlineGovernance.settlement.operatorCToA.pass),
       EXCEPTION_CODES.TRUSTLINE_PRECHECK_FAILED,
       true,
       {
         operatorBToA: settlementLog.trustlineGovernance.settlement.operatorBToA.pass,
-        operatorCToA: settlementLog.trustlineGovernance.settlement.operatorCToA.pass,
+        ...(operatorCEnabled ? { operatorCToA: settlementLog.trustlineGovernance.settlement.operatorCToA.pass } : {}),
       },
       {
         operatorBToA: settlementLog.trustlineGovernance.settlement.operatorBToA.exceptionReasons,
-        operatorCToA: settlementLog.trustlineGovernance.settlement.operatorCToA.exceptionReasons,
+        ...(operatorCEnabled ? { operatorCToA: settlementLog.trustlineGovernance.settlement.operatorCToA.exceptionReasons } : {}),
       },
     ),
   )
 
   const failures = checks.filter((check) => !check.pass)
   settlementLog.reconciliation = {
-    method: "deterministic_rule_matcher_v3_three_operators",
+    method: operatorCEnabled ? "deterministic_rule_matcher_v3_three_operators" : "deterministic_rule_matcher_v3_two_operators",
     checkedAt: new Date().toISOString(),
     checks,
     exceptionReasons: [...new Set(failures.map((failure) => failure.reasonCode))],
@@ -645,15 +684,24 @@ async function persistSettlementLog(settlementLog) {
 }
 
 async function setIssuerFlags(client, issuerWallet) {
-  const tx = {
-    TransactionType: "AccountSet",
-    SetFlag: xrpl.AccountSetAsfFlags.asfDefaultRipple,
+  const flagTxs = []
+
+  if (REQUIRE_AUTH_ENABLED) {
+    flagTxs.push({ TransactionType: "AccountSet", SetFlag: xrpl.AccountSetAsfFlags.asfRequireAuth })
   }
 
-  const result = await submitAndWait(client, issuerWallet, tx)
-  const code = txResultCode(result)
-  if (code !== "tesSUCCESS") {
-    throw new Error(`Issuer AccountSet failed: ${code}`)
+  if (DEFAULT_RIPPLE_ENABLED) {
+    flagTxs.push({ TransactionType: "AccountSet", SetFlag: xrpl.AccountSetAsfFlags.asfDefaultRipple })
+  } else {
+    flagTxs.push({ TransactionType: "AccountSet", ClearFlag: xrpl.AccountSetAsfFlags.asfDefaultRipple })
+  }
+
+  for (const tx of flagTxs) {
+    const result = await submitAndWait(client, issuerWallet, tx)
+    const code = txResultCode(result)
+    if (code !== "tesSUCCESS") {
+      throw new Error(`Issuer AccountSet failed: ${code}`)
+    }
   }
 }
 
@@ -694,22 +742,37 @@ async function main() {
     const treasury = await client.fundWallet()
     const operatorA = await client.fundWallet()
     const operatorB = await client.fundWallet()
-    const operatorC = await client.fundWallet()
+    const operatorC = OPERATOR_C_ENABLED ? await client.fundWallet() : null
 
     console.log("\nWallets funded on testnet:")
     console.log(`- Issuer:    ${issuer.wallet.classicAddress}`)
     console.log(`- Treasury:  ${treasury.wallet.classicAddress}`)
     console.log(`- OperatorA: ${operatorA.wallet.classicAddress}`)
     console.log(`- OperatorB: ${operatorB.wallet.classicAddress}`)
-    console.log(`- OperatorC: ${operatorC.wallet.classicAddress}`)
+    if (operatorC) {
+      console.log(`- OperatorC: ${operatorC.wallet.classicAddress}`)
+    }
 
     await setIssuerFlags(client, issuer.wallet)
-    console.log("Issuer flags configured (DefaultRipple).")
+    console.log(`Issuer flags configured (RequireAuth=${REQUIRE_AUTH_ENABLED}, DefaultRipple=${DEFAULT_RIPPLE_ENABLED}).`)
 
     await trustSet(client, treasury.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     await trustSet(client, operatorA.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     await trustSet(client, operatorB.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
-    await trustSet(client, operatorC.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    if (operatorC) {
+      await trustSet(client, operatorC.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    }
+
+    if (REQUIRE_AUTH_ENABLED) {
+      await authorizeTrustline(client, issuer.wallet, treasury.wallet.classicAddress, CURRENCY_CODE)
+      await authorizeTrustline(client, issuer.wallet, operatorA.wallet.classicAddress, CURRENCY_CODE)
+      await authorizeTrustline(client, issuer.wallet, operatorB.wallet.classicAddress, CURRENCY_CODE)
+      if (operatorC) {
+        await authorizeTrustline(client, issuer.wallet, operatorC.wallet.classicAddress, CURRENCY_CODE)
+      }
+      console.log(`Trust lines authorized by issuer for ${CURRENCY_CODE}.`)
+    }
+
     console.log(`Trust lines created for ${CURRENCY_CODE}.`)
 
     const issuanceTrustlineCheck = await evaluateTrustlineGovernance(client, {
@@ -747,24 +810,31 @@ async function main() {
       value: operatorSettlementPlan.operatorBAmount,
     }, fundingMemoB)
 
-    const fundingTrustlineCheckC = await evaluateTrustlineGovernance(client, {
-      stage: "operator_funding_C",
-      senderAddress: treasury.wallet.classicAddress,
-      destinationAddress: operatorC.wallet.classicAddress,
-      issuerAddress: issuer.wallet.classicAddress,
-      currency: CURRENCY_CODE,
-      amount: operatorSettlementPlan.operatorCAmount,
-    })
-    enforceTrustlineGovernanceResult(fundingTrustlineCheckC)
+    let fundingTrustlineCheckC = { pass: true, checks: [], exceptionReasons: [] }
+    let fundingMemoC = null
+    let fundingResultC = null
+    if (operatorC && parseAmount(operatorSettlementPlan.operatorCAmount) > 0) {
+      fundingTrustlineCheckC = await evaluateTrustlineGovernance(client, {
+        stage: "operator_funding_C",
+        senderAddress: treasury.wallet.classicAddress,
+        destinationAddress: operatorC.wallet.classicAddress,
+        issuerAddress: issuer.wallet.classicAddress,
+        currency: CURRENCY_CODE,
+        amount: operatorSettlementPlan.operatorCAmount,
+      })
+      enforceTrustlineGovernanceResult(fundingTrustlineCheckC)
 
-    const fundingMemoC = createCanonicalMemoFields("OPERATOR_FUNDING_C", "N")
-    const fundingResultC = await paymentWithMemo(client, treasury.wallet, operatorC.wallet.classicAddress, {
-      currency: CURRENCY_CODE,
-      issuer: issuer.wallet.classicAddress,
-      value: operatorSettlementPlan.operatorCAmount,
-    }, fundingMemoC)
+      fundingMemoC = createCanonicalMemoFields("OPERATOR_FUNDING_C", "N")
+      fundingResultC = await paymentWithMemo(client, treasury.wallet, operatorC.wallet.classicAddress, {
+        currency: CURRENCY_CODE,
+        issuer: issuer.wallet.classicAddress,
+        value: operatorSettlementPlan.operatorCAmount,
+      }, fundingMemoC)
+    }
 
-    console.log(`Funded OperatorB (${operatorSettlementPlan.operatorBAmount}) and OperatorC (${operatorSettlementPlan.operatorCAmount}) for settlement.`)
+    console.log(operatorC
+      ? `Funded OperatorB (${operatorSettlementPlan.operatorBAmount}) and OperatorC (${operatorSettlementPlan.operatorCAmount}) for settlement.`
+      : `Funded OperatorB (${operatorSettlementPlan.operatorBAmount}) for settlement.`)
 
     const settlementTrustlineCheckB = await evaluateTrustlineGovernance(client, {
       stage: "settlement_operatorB_to_A",
@@ -855,7 +925,7 @@ async function main() {
         treasury: treasury.wallet.classicAddress,
         operatorA: operatorA.wallet.classicAddress,
         operatorB: operatorB.wallet.classicAddress,
-        operatorC: operatorC.wallet.classicAddress,
+        operatorC: operatorC ? operatorC.wallet.classicAddress : null,
       },
       operatorSettlementPlan,
       trustlineGovernance: {
@@ -958,7 +1028,9 @@ async function main() {
     await printAccountSnapshot(client, "Treasury", treasury.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     await printAccountSnapshot(client, "OperatorA", operatorA.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
     await printAccountSnapshot(client, "OperatorB", operatorB.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
-    await printAccountSnapshot(client, "OperatorC", operatorC.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    if (operatorC) {
+      await printAccountSnapshot(client, "OperatorC", operatorC.wallet, issuer.wallet.classicAddress, CURRENCY_CODE)
+    }
   } finally {
     await client.disconnect()
   }

@@ -105,6 +105,9 @@ function buildOverrides(input) {
     BATCH_END_DATE: input.batchEndDate,
     BATCH_REFERENCE_IDS: input.batchReferenceIds,
     OPERATOR_B_SHARE: input.operatorBShare,
+    OPERATOR_C_ENABLED: input.operatorCEnabled,
+    REQUIRE_AUTH_ENABLED: input.requireAuthEnabled,
+    DEFAULT_RIPPLE_ENABLED: input.defaultRippleEnabled,
     RECON_OUTPUT_PATH: input.reconOutputPath,
   }
 }
@@ -179,6 +182,9 @@ const server = http.createServer(async (req, res) => {
         batchEndDate: requestUrl.searchParams.get("batchEndDate"),
         batchReferenceIds: requestUrl.searchParams.get("batchReferenceIds"),
         operatorBShare: requestUrl.searchParams.get("operatorBShare"),
+        operatorCEnabled: requestUrl.searchParams.get("operatorCEnabled"),
+        requireAuthEnabled: requestUrl.searchParams.get("requireAuthEnabled"),
+        defaultRippleEnabled: requestUrl.searchParams.get("defaultRippleEnabled"),
         reconOutputPath: requestUrl.searchParams.get("reconOutputPath"),
       }
 

@@ -77,6 +77,9 @@ function validatePayload(payload) {
   parseBoolLike(payload.trustlineGovernanceEnforced)
   ensureNonNegativeInteger("retryIntervalCycles", payload.retryIntervalCycles)
   ensureNumeric("operatorBShare", payload.operatorBShare)
+  parseBoolLike(payload.operatorCEnabled)
+  parseBoolLike(payload.requireAuthEnabled)
+  parseBoolLike(payload.defaultRippleEnabled)
 }
 
 
@@ -383,6 +386,9 @@ runBtn.addEventListener("click", async () => {
     batchEndDate: value("batchEndDate"),
     batchReferenceIds: value("batchReferenceIds"),
     operatorBShare: value("operatorBShare"),
+    operatorCEnabled: value("operatorCEnabled"),
+    requireAuthEnabled: value("requireAuthEnabled"),
+    defaultRippleEnabled: value("defaultRippleEnabled"),
     reconOutputPath: value("reconOutputPath"),
   }
 

@@ -96,6 +96,9 @@ Optional environment variables:
 - `RETRY_INTERVAL_CYCLES` (default: `1`)
 - `TRUSTLINE_GOVERNANCE_ENFORCED` (`true`/`false`, default: `true`)
 - `OPERATOR_B_SHARE` (default: `0.6`; Operator C share is `1 - OPERATOR_B_SHARE`)
+- `OPERATOR_C_ENABLED` (`true`/`false`, default: `true`; set `false` for a 2-operator settlement cohort)
+- `REQUIRE_AUTH_ENABLED` (`true`/`false`, default: `true`)
+- `DEFAULT_RIPPLE_ENABLED` (`true`/`false`, default: `false`)
 - `RECON_OUTPUT_PATH` (default: `artifacts/settlement-log.json`)
 
 
@@ -109,7 +112,7 @@ Canonical memo schema (locked for this PoC):
 
 All issuance, settlement, and redemption payments now use this same schema in XRPL memo JSON payloads.
 
-Deterministic reconciliation now evaluates both settlement transactions (OperatorB->OperatorA and OperatorC->OperatorA) against explicit rules:
+Deterministic reconciliation evaluates the active settlement legs (OperatorB->OperatorA and, when enabled, OperatorC->OperatorA) against explicit rules:
 - tx hash exists
 - amount matches expected settlement amount
 - operator/counterparty addresses match expected direction for each settlement leg
@@ -170,8 +173,8 @@ Notes:
 
 ## Alignment with the Postal Operator PoC plan
 
-- Current implementation is fixed at a 3-operator settlement cohort (A/B/C), which fits the pilot range and can be extended to 5 in a follow-up iteration.
-- Trust lines are required before issuance/settlement/redemption and are preflight-checked by governance controls.
+- Current implementation supports a 2- or 3-operator settlement cohort (A/B always present, optional C via `OPERATOR_C_ENABLED`).
+- Trust lines are required before issuance/settlement/redemption, are preflight-checked by governance controls, and can be issuer-authorized when `REQUIRE_AUTH_ENABLED=true`.
 - Settlement is executed as a deterministic batch of on-ledger `Payment` transactions with canonical memo fields for auditability.
 - Redemption is modeled as operator-to-issuer token return; off-ledger fiat release is intentionally out of scope for this repo.
 - Multi-signature, Escrow, and Hooks are not enabled in this PoC and remain optional enhancements for post-pilot hardening.
