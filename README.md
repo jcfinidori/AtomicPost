@@ -11,7 +11,7 @@ This repository contains a minimal proof-of-concept flow for launching a fiat-ba
   - **Operator B** (net debtor in PoC settlement)
   - **Operator C** (net debtor in PoC settlement)
 - Configuring issuer account flags suitable for a managed token setup.
-- Establishing trust lines from treasury and user to the issuer.
+- Establishing trust lines from treasury and operators (A/B/C) to the issuer.
 - Issuing a USD-denominated IOU token (`USD`) to treasury.
 - Funding net-debtor operators (B and C) from treasury for settlement execution.
 - Settling net obligations on-ledger from operators B/C to operator A.
@@ -109,10 +109,10 @@ Canonical memo schema (locked for this PoC):
 
 All issuance, settlement, and redemption payments now use this same schema in XRPL memo JSON payloads.
 
-Deterministic reconciliation now evaluates the settlement transaction against explicit rules:
+Deterministic reconciliation now evaluates both settlement transactions (OperatorB->OperatorA and OperatorC->OperatorA) against explicit rules:
 - tx hash exists
 - amount matches expected settlement amount
-- treasury/counterparty addresses match expected direction
+- operator/counterparty addresses match expected direction for each settlement leg
 - canonical memo schema fields match
 - partial-flag consistency with settlement decision (`N` full, `Y` partial)
 - XRPL transaction result is `tesSUCCESS`
