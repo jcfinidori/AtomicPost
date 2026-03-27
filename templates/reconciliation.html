@@ -1,0 +1,823 @@
+{% extends "base.html" %}
+
+{% block title %}Reconciliation — La Poste CI Settlement{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Summary metric cards ────────────────────────────────── */
+  .metric-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 640px) { .metric-row { grid-template-columns: repeat(2,1fr); } }
+
+  .metric-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .metric-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .metric-icon.grey  { background: #eef1f7; }
+  .metric-icon.green { background: var(--green-bg); }
+  .metric-icon.red   { background: var(--red-bg); }
+  .metric-icon.amber { background: var(--amber-bg); }
+
+  .metric-info { display: flex; flex-direction: column; }
+
+  .metric-value {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+    font-family: 'Courier New', monospace;
+  }
+
+  .metric-value.grey  { color: var(--muted); }
+  .metric-value.green { color: var(--green); }
+  .metric-value.red   { color: var(--red); }
+  .metric-value.amber { color: var(--amber); }
+
+  .metric-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  /* ── Reconcile All section ───────────────────────────────── */
+  .reconcile-all-bar {
+    background: var(--navy-dark);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    border: 1px solid var(--navy-mid);
+  }
+
+  .reconcile-all-text {
+    color: #9db3cc;
+    font-size: 13px;
+    line-height: 1.5;
+    flex: 1;
+  }
+
+  #reconcile-all-results {
+    display: none;
+    margin-top: 14px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+
+  .ra-summary {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ra-summary-item {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .ra-result-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 12px;
+    border-bottom: 1px solid #f0f2f7;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: opacity .25s ease, transform .25s ease;
+  }
+
+  .ra-result-line.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .ra-result-line:last-child { border-bottom: none; }
+
+  .ra-hash { font-family: monospace; color: var(--muted); }
+
+  /* ── Pending reconciliation table ────────────────────────── */
+  .recon-panel {
+    display: none;
+    background: #f8fafd;
+    border-top: 1px solid var(--border);
+    padding: 14px 16px;
+  }
+
+  .recon-panel.open { display: block; }
+
+  .expected-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 500px) { .expected-grid { grid-template-columns: 1fr; } }
+
+  .expected-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .expected-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+  }
+
+  .expected-value {
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    color: var(--navy-dark);
+    word-break: break-all;
+  }
+
+  /* ── Reconciliation result card (Section 4) ──────────────── */
+  .result-card {
+    border-radius: var(--radius);
+    border: 2px solid var(--border);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    background: var(--white);
+  }
+
+  .result-card.reconciled { border-color: var(--green); background: #f0faf5; }
+  .result-card.exception  { border-color: var(--red);   background: #fdf2f1; }
+
+  .check-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(0,0,0,.06);
+    font-size: 13px;
+  }
+
+  .check-row:last-child { border-bottom: none; }
+
+  .check-icon { font-size: 16px; }
+  .check-pass { color: var(--green); font-weight: 700; }
+  .check-fail { color: var(--red);   font-weight: 700; }
+
+  .result-verdict {
+    font-size: 15px;
+    font-weight: 800;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 2px solid rgba(0,0,0,.08);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Exception management ────────────────────────────────── */
+  @keyframes exception-pulse {
+    0%, 100% { background: var(--red-bg); }
+    50%       { background: #fce8e6; }
+  }
+
+  .exception-pulse td {
+    animation: exception-pulse 2.5s ease-in-out infinite;
+  }
+
+  .resolved-row td { background: #f3f3f3; color: var(--muted); }
+
+  .resolution-form {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .resolution-form select,
+  .resolution-form input[type="text"] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 8px;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .resolution-form select { width: 150px; }
+  .resolution-form input[type="text"] { flex: 1; min-width: 120px; }
+
+  /* ── Full transaction ledger ─────────────────────────────── */
+  tr.row-reconciled td { background: #f0faf5; }
+  tr.row-exception  td {
+    background: var(--red-bg);
+    animation: exception-pulse 2.5s ease-in-out infinite;
+  }
+
+  .status-confirmed   { background: var(--blue-bg);   color: var(--blue); }
+  .status-reconciled  { background: var(--green-bg);  color: var(--green); }
+  .status-exception   { background: var(--red-bg);    color: var(--red); }
+
+  .hash-mono {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Progress text ───────────────────────────────────────── */
+  #ra-progress-msg {
+    font-size: 12px;
+    color: #8fa8c8;
+    margin-top: 6px;
+    min-height: 18px;
+  }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<h1 class="page-title">Reconciliation &amp; Exception Handling</h1>
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 1: Summary metric bar
+   Four cards: total, reconciled, exceptions, pending.
+   ══════════════════════════════════════════════════════════ #}
+<div class="metric-row">
+  <div class="metric-card">
+    <div class="metric-icon grey">📋</div>
+    <div class="metric-info">
+      <span class="metric-value grey">{{ all_txs | length }}</span>
+      <span class="metric-label">Total Transactions</span>
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-icon green">✅</div>
+    <div class="metric-info">
+      <span class="metric-value green">{{ reconciled_count }}</span>
+      <span class="metric-label">Reconciled</span>
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-icon red">⚠️</div>
+    <div class="metric-info">
+      <span class="metric-value red">{{ exception_count }}</span>
+      <span class="metric-label">Exceptions</span>
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-icon amber">⏳</div>
+    <div class="metric-info">
+      <span class="metric-value amber">{{ pending_count }}</span>
+      <span class="metric-label">Pending</span>
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 2: Auto-Reconcile All
+   One button calls /reconciliation/reconcile-all via fetch().
+   Results animate in one by one below the button.
+   ══════════════════════════════════════════════════════════ #}
+<div class="reconcile-all-bar">
+  <div style="flex:1">
+    <div style="color:var(--gold-light); font-weight:700; font-size:14px; margin-bottom:4px">
+      Auto-Reconcile All Pending
+    </div>
+    <div class="reconcile-all-text">
+      Automatically matches all confirmed XRPL transactions against
+      off-ledger settlement records. Flags any mismatches as exceptions.
+    </div>
+    <div id="ra-progress-msg"></div>
+  </div>
+  <button class="btn btn-gold"
+          style="font-size:14px; padding:10px 22px; flex-shrink:0"
+          id="ra-btn"
+          onclick="reconcileAll()">
+    ⚡ Auto-Reconcile All
+  </button>
+</div>
+
+<div id="reconcile-all-results">
+  <div class="ra-summary" id="ra-summary"></div>
+  <div id="ra-lines"></div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 3: Pending Reconciliation Table
+   Shows all Confirmed transactions with an inline panel
+   for manual reconciliation. Each row expands to show
+   expected values and a confirm button.
+   ══════════════════════════════════════════════════════════ #}
+<div class="card">
+  <div class="card-title" style="margin-bottom:14px">
+    Pending Reconciliation
+    <span style="font-weight:400; font-size:12px; color:var(--muted); margin-left:6px">
+      ({{ pending_txs | length }} confirmed, awaiting reconciliation)
+    </span>
+  </div>
+
+  {% if pending_txs %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Tx Hash</th>
+          <th>Type</th>
+          <th style="text-align:right">Amount</th>
+          <th>Clearing Cycle</th>
+          <th>Best-Match Record</th>
+          <th style="text-align:center">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tx in pending_txs %}
+          {% set linked = tx.LinkedRecord %}
+        <tr id="row-{{ loop.index }}">
+          <td class="hash-mono">
+            {{ tx.TxHash[:10] ~ '…' if tx.TxHash else '—' }}
+          </td>
+          <td>
+            <span class="badge badge-blue"
+                  style="background:var(--blue-bg);color:var(--blue)">
+              {{ tx.TransactionType }}
+            </span>
+          </td>
+          <td style="text-align:right; font-family:monospace; font-weight:700">
+            {{ "{:,.4f}".format(tx.Amount or 0) }}
+          </td>
+          <td style="font-family:monospace; font-size:12px">
+            {{ tx.ClearingCycleID or '—' }}
+          </td>
+          <td style="font-size:12px">
+            {% if linked %}
+              <span class="badge badge-muted">{{ linked.SettlementRecordID }}</span>
+              <span style="color:var(--muted); font-size:11px; margin-left:4px">
+                {{ linked.CounterpartyID }} / {{ linked.Direction }}
+              </span>
+            {% else %}
+              <span style="color:var(--muted)">No match found</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center">
+            <button class="btn btn-navy"
+                    style="font-size:11px; padding:5px 12px"
+                    onclick="toggleReconPanel('panel-{{ loop.index }}')">
+              Reconcile
+            </button>
+          </td>
+        </tr>
+
+        {# Inline reconciliation panel #}
+        <tr>
+          <td colspan="6" style="padding:0; border:none">
+            <div class="recon-panel" id="panel-{{ loop.index }}">
+              {% if linked %}
+                <form method="POST"
+                      action="{{ url_for('reconciliation_reconcile') }}">
+                  <input type="hidden" name="tx_hash"
+                         value="{{ tx.TxHash }}" />
+                  <input type="hidden" name="settlement_record_id"
+                         value="{{ linked.SettlementRecordID }}" />
+
+                  <div class="expected-grid">
+                    <div class="expected-item">
+                      <span class="expected-label">Expected Amount</span>
+                      <span class="expected-value">
+                        {{ "{:,.4f}".format(linked.Amount or 0) }} USDST
+                      </span>
+                    </div>
+                    <div class="expected-item">
+                      <span class="expected-label">Expected Cycle ID</span>
+                      <span class="expected-value">{{ linked.ClearingCycleID }}</span>
+                    </div>
+                    <div class="expected-item">
+                      <span class="expected-label">Expected Sender</span>
+                      <span class="expected-value">
+                        {% if linked.Direction == 'Payable' %}
+                          {{ addrs.get('issuer_treasury','—')[:20] }}…
+                          <span style="color:var(--muted)">(La Poste CI)</span>
+                        {% else %}
+                          {% if linked.CounterpartyID == 'UAE_POST' %}
+                            {{ addrs.get('operator_a','—')[:20] }}…
+                            <span style="color:var(--muted)">(UAE Post)</span>
+                          {% else %}
+                            {{ addrs.get('operator_b','—')[:20] }}…
+                            <span style="color:var(--muted)">(Kenya Post)</span>
+                          {% endif %}
+                        {% endif %}
+                      </span>
+                    </div>
+                    <div class="expected-item">
+                      <span class="expected-label">Expected Receiver</span>
+                      <span class="expected-value">
+                        {% if linked.Direction == 'Payable' %}
+                          {% if linked.CounterpartyID == 'UAE_POST' %}
+                            {{ addrs.get('operator_a','—')[:20] }}…
+                            <span style="color:var(--muted)">(UAE Post)</span>
+                          {% else %}
+                            {{ addrs.get('operator_b','—')[:20] }}…
+                            <span style="color:var(--muted)">(Kenya Post)</span>
+                          {% endif %}
+                        {% else %}
+                          {{ addrs.get('issuer_treasury','—')[:20] }}…
+                          <span style="color:var(--muted)">(La Poste CI)</span>
+                        {% endif %}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="btn btn-gold"
+                          style="font-size:12px; padding:7px 16px">
+                    ✓ Confirm Reconciliation
+                  </button>
+                  <span style="font-size:11px; color:var(--muted); margin-left:10px">
+                    Will fetch live XRPL data and run all 4 checks.
+                  </span>
+                </form>
+              {% else %}
+                <div style="color:var(--muted); font-size:13px">
+                  No matching settlement record found for this transaction.
+                  Manual review required.
+                </div>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty-state">
+      No transactions pending reconciliation.
+    </div>
+  {% endif %}
+</div>
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 4: Reconciliation Result Card
+   Shown only when ?last_tx= param is set.
+   Displays four check rows and overall verdict.
+   Populated from the most recent audit_log entry for
+   that tx hash.
+   ══════════════════════════════════════════════════════════ #}
+{% if last_tx and last_result %}
+  {% set is_recon = 'Confirmed' in last_result.Action %}
+  <div class="result-card {{ 'reconciled' if is_recon else 'exception' }}">
+    <div class="card-title" style="margin-bottom:10px">
+      Reconciliation Result — <span style="font-family:monospace">
+        {{ last_tx[:14] }}…
+      </span>
+    </div>
+
+    {# Parse checks from the Details string #}
+    {% set d = last_result.Details %}
+    <div class="check-row">
+      <span>Amount Match</span>
+      {% if '✓' in d and 'Amount' in d %}
+        <span class="check-icon check-pass">✅ Pass</span>
+      {% else %}
+        <span class="check-icon check-fail">❌ Fail</span>
+      {% endif %}
+    </div>
+    <div class="check-row">
+      <span>Sender Match</span>
+      {% if 'Sender: ✓' in d %}
+        <span class="check-icon check-pass">✅ Pass</span>
+      {% else %}
+        <span class="check-icon check-fail">❌ Fail</span>
+      {% endif %}
+    </div>
+    <div class="check-row">
+      <span>Receiver Match</span>
+      {% if 'Receiver: ✓' in d %}
+        <span class="check-icon check-pass">✅ Pass</span>
+      {% else %}
+        <span class="check-icon check-fail">❌ Fail</span>
+      {% endif %}
+    </div>
+    <div class="check-row">
+      <span>Memo / Cycle ID Match</span>
+      {% if 'Memo: ✓' in d %}
+        <span class="check-icon check-pass">✅ Pass</span>
+      {% else %}
+        <span class="check-icon check-fail">❌ Fail</span>
+      {% endif %}
+    </div>
+
+    <div class="result-verdict">
+      {% if is_recon %}
+        <span style="color:var(--green)">✅ RECONCILED</span>
+        <span style="font-size:12px; color:var(--muted); font-weight:400">
+          All checks passed. Settlement record updated to Reconciled.
+        </span>
+      {% else %}
+        {% set reason = 'UNKNOWN' %}
+        {% for word in d.split('|') %}
+          {% if 'Reason:' in word %}
+            {% set reason = word.replace('Reason:','').strip() %}
+          {% endif %}
+        {% endfor %}
+        <span style="color:var(--red)">❌ EXCEPTION</span>
+        <span class="badge"
+              style="background:var(--red-bg);color:var(--red);font-size:12px">
+          {{ reason }}
+        </span>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 5: Exception Management
+   All transactions with Status=Exception.
+   Exception rows pulse in red. Each has a resolution
+   form with dropdown + notes + Resolve button.
+   Resolved exceptions are shown in grey (from audit_log).
+   ══════════════════════════════════════════════════════════ #}
+{% if exception_txs %}
+<div class="card">
+  <div class="card-title" style="margin-bottom:14px">
+    Exception Management
+    <span class="badge"
+          style="background:var(--red-bg);color:var(--red);margin-left:8px">
+      {{ exception_txs | length }}
+    </span>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Tx Hash</th>
+        <th>Cycle</th>
+        <th style="text-align:right">Amount</th>
+        <th>Type</th>
+        <th>Detected At</th>
+        <th>Resolution</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tx in exception_txs %}
+        {% set resolved = exception_resolutions.get(tx.TxHash) %}
+        <tr class="{{ 'resolved-row' if resolved else 'exception-pulse' }}">
+          <td class="hash-mono">
+            {{ tx.TxHash[:10] ~ '…' if tx.TxHash else '—' }}
+          </td>
+          <td style="font-family:monospace; font-size:12px">
+            {{ tx.ClearingCycleID or '—' }}
+          </td>
+          <td style="text-align:right; font-family:monospace; font-weight:700">
+            {{ "{:,.4f}".format(tx.Amount or 0) }}
+          </td>
+          <td>
+            <span class="badge badge-muted">{{ tx.TransactionType }}</span>
+          </td>
+          <td style="font-size:11px; color:var(--muted)">
+            {{ tx.ConfirmedAt[:16].replace('T',' ') if tx.ConfirmedAt else '—' }}
+          </td>
+          <td>
+            {% if resolved %}
+              <div style="font-size:11px; color:var(--muted)">
+                ✓ {{ resolved.Details.split('Action:')[1].split('|')[0].strip()
+                     if 'Action:' in resolved.Details else 'Resolved' }}
+                <div style="font-size:10px">
+                  {{ resolved.Timestamp[:16].replace('T',' ') }}
+                </div>
+              </div>
+            {% else %}
+              <form method="POST"
+                    action="{{ url_for('reconciliation_resolve_exception') }}"
+                    class="resolution-form">
+                <input type="hidden" name="tx_hash" value="{{ tx.TxHash }}" />
+                <select name="resolution_action">
+                  <option value="correct_reference">Correct Reference</option>
+                  <option value="retry">Retry Payment</option>
+                  <option value="write_off">Write Off</option>
+                </select>
+                <input type="text" name="resolution_notes"
+                       placeholder="Notes…" maxlength="200" />
+                <button type="submit" class="btn btn-navy"
+                        style="font-size:11px; padding:5px 12px">
+                  Resolve
+                </button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 6: Full Transaction Ledger
+   All transactions regardless of status.
+   Row colour: green=Reconciled, red=Exception, white=rest.
+   ══════════════════════════════════════════════════════════ #}
+<div class="card">
+  <div class="card-title" style="margin-bottom:14px">
+    Full Transaction Ledger
+    <span style="font-weight:400; font-size:12px; color:var(--muted); margin-left:6px">
+      ({{ all_txs | length }} total)
+    </span>
+  </div>
+
+  {% if all_txs %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Tx Hash</th>
+          <th>Type</th>
+          <th style="text-align:right">Amount</th>
+          <th>Cycle ID</th>
+          <th>Status</th>
+          <th>Confirmed At</th>
+          <th>Reconciled At</th>
+          <th>Explorer</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tx in all_txs %}
+          {% set row_cls = 'row-reconciled' if tx.Status == 'Reconciled'
+                           else ('row-exception' if tx.Status == 'Exception' else '') %}
+        <tr class="{{ row_cls }}">
+          <td class="hash-mono">
+            {{ tx.TxHash[:10] ~ '…' if tx.TxHash else '—' }}
+          </td>
+          <td>
+            <span class="badge badge-muted" style="font-size:10px">
+              {{ tx.TransactionType }}
+            </span>
+          </td>
+          <td style="text-align:right; font-family:monospace; font-size:13px; font-weight:700">
+            {{ "{:,.4f}".format(tx.Amount or 0) }}
+          </td>
+          <td style="font-family:monospace; font-size:12px">
+            {{ tx.ClearingCycleID or '—' }}
+          </td>
+          <td>
+            {% if tx.Status == 'Confirmed' %}
+              <span class="badge status-confirmed">Confirmed</span>
+            {% elif tx.Status == 'Reconciled' %}
+              <span class="badge status-reconciled">Reconciled</span>
+            {% elif tx.Status == 'Exception' %}
+              <span class="badge status-exception">Exception</span>
+            {% else %}
+              <span class="badge badge-muted">{{ tx.Status }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:11px; color:var(--muted); white-space:nowrap">
+            {{ tx.ConfirmedAt[:16].replace('T',' ') if tx.ConfirmedAt else '—' }}
+          </td>
+          <td style="font-size:11px; color:var(--green); white-space:nowrap">
+            {% if tx.ReconciledAt %}
+              {{ tx.ReconciledAt[:16].replace('T',' ') }}
+            {% else %}
+              <span style="color:var(--muted)">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if tx.TxHash and tx.TxHash | length == 64 %}
+              <a href="https://testnet.xrpl.org/transactions/{{ tx.TxHash }}"
+                 target="_blank" rel="noopener"
+                 style="font-size:12px">View ↗</a>
+            {% else %}
+              <span style="color:var(--muted); font-size:12px">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty-state">No transactions recorded yet.</div>
+  {% endif %}
+</div>
+
+
+{# ── JavaScript ──────────────────────────────────────────── #}
+<script>
+(function () {
+
+  /* ── Toggle inline reconciliation panels ─────────────── */
+  window.toggleReconPanel = function (panelId) {
+    var panel = document.getElementById(panelId);
+    if (!panel) return;
+    panel.classList.toggle('open');
+  };
+
+  /* ── Auto-Reconcile All via fetch() ──────────────────── */
+  window.reconcileAll = function () {
+    var btn     = document.getElementById('ra-btn');
+    var results = document.getElementById('reconcile-all-results');
+    var summary = document.getElementById('ra-summary');
+    var lines   = document.getElementById('ra-lines');
+    var progress = document.getElementById('ra-progress-msg');
+
+    btn.disabled    = true;
+    btn.textContent = '⏳ Reconciling…';
+    if (progress) progress.textContent = 'Connecting to XRPL testnet…';
+
+    fetch('{{ url_for("reconciliation_reconcile_all") }}', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: new FormData(),
+    })
+    .then(function (resp) { return resp.json(); })
+    .then(function (data) {
+      if (data.error) {
+        if (progress) progress.textContent = 'Error: ' + data.error;
+        btn.disabled    = false;
+        btn.textContent = '⚡ Auto-Reconcile All';
+        return;
+      }
+
+      results.style.display = 'block';
+
+      // Summary line
+      summary.innerHTML =
+        '<span class="ra-summary-item" style="color:var(--muted)">Total: ' +
+        data.total + '</span>' +
+        '<span class="ra-summary-item" style="color:var(--green)">✅ Reconciled: ' +
+        data.reconciled + '</span>' +
+        '<span class="ra-summary-item" style="color:var(--red)">❌ Exceptions: ' +
+        data.exceptions + '</span>';
+
+      // Individual result lines — animate in one by one
+      lines.innerHTML = '';
+      data.results.forEach(function (r, idx) {
+        var div = document.createElement('div');
+        div.className = 'ra-result-line';
+        var icon = r.reconciled ? '✅' : '❌';
+        var colour = r.reconciled ? 'var(--green)' : 'var(--red)';
+        var msg  = r.reconciled
+          ? ('Reconciled against ' + (r.sr_id || 'record'))
+          : ('Exception: ' + (r.reason || 'unknown'));
+        div.innerHTML =
+          '<span>' + icon + '</span>' +
+          '<span class="ra-hash">' + r.tx_hash.substring(0, 12) + '…</span>' +
+          '<span style="color:' + colour + '; font-weight:600">' + msg + '</span>';
+        lines.appendChild(div);
+
+        // Staggered entrance
+        setTimeout(function () {
+          div.classList.add('visible');
+          if (progress) {
+            progress.textContent = 'Reconciling transaction ' +
+              (idx + 1) + ' of ' + data.results.length + '…';
+          }
+        }, idx * 180);
+      });
+
+      setTimeout(function () {
+        if (progress) progress.textContent =
+          'Complete — ' + data.reconciled + ' reconciled, ' +
+          data.exceptions + ' exception(s). Reload page to see updated statuses.';
+        btn.disabled    = false;
+        btn.textContent = '⚡ Auto-Reconcile All';
+      }, data.results.length * 180 + 400);
+    })
+    .catch(function (err) {
+      if (progress) progress.textContent = 'Network error: ' + err;
+      btn.disabled    = false;
+      btn.textContent = '⚡ Auto-Reconcile All';
+    });
+  };
+
+}());
+</script>
+{% endblock %}

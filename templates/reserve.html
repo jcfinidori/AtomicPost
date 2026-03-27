@@ -1,0 +1,772 @@
+{% extends "base.html" %}
+
+{% block title %}Reserve Governance — La Poste CI Settlement{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Reserve status cards ────────────────────────────────── */
+  .reserve-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .reserve-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .reserve-card-header {
+    background: var(--navy-dark);
+    color: var(--white);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .reserve-card-title {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    color: var(--gold-light);
+  }
+
+  .reserve-card-body {
+    padding: 16px;
+  }
+
+  .reserve-stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .reserve-stat {
+    text-align: center;
+    padding: 10px 8px;
+    border-radius: var(--radius);
+    background: var(--off-white);
+  }
+
+  .reserve-stat-value {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.1;
+    font-family: 'Courier New', monospace;
+  }
+
+  .reserve-stat-value.gold  { color: #8a6c00; }
+  .reserve-stat-value.blue  { color: var(--blue); }
+  .reserve-stat-value.green { color: var(--green); }
+  .reserve-stat-value.red   { color: var(--red); }
+
+  .reserve-stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .no-backing-msg {
+    background: var(--amber-bg);
+    color: var(--amber);
+    border: 1px solid #f0c080;
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ── Progress bar (reused from base, extended here) ─────── */
+  .util-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .util-pct-label {
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 38px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .util-pct-label.green { color: var(--green); }
+  .util-pct-label.amber { color: var(--amber); }
+  .util-pct-label.red   { color: var(--red); }
+
+  /* ── Info boxes ──────────────────────────────────────────── */
+  .info-box {
+    border-radius: var(--radius);
+    padding: 11px 14px;
+    font-size: 12px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .info-box.blue  {
+    background: var(--blue-bg);
+    color: #1045a0;
+    border: 1px solid #b8cef0;
+  }
+
+  .info-box.gold  {
+    background: #fffbea;
+    color: #7a5300;
+    border: 1px solid #f0d880;
+  }
+
+  .info-box-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── Forms ───────────────────────────────────────────────── */
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .form-group.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+
+  input[type="number"],
+  select {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--white);
+    width: 100%;
+  }
+
+  input[type="number"]:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--navy);
+    box-shadow: 0 0 0 3px rgba(13,43,85,.1);
+  }
+
+  .helper-text {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* live remaining display */
+  #remaining-display {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 20px;
+    transition: color .2s;
+  }
+
+  #remaining-display.ok     { color: var(--green); }
+  #remaining-display.warn   { color: var(--amber); }
+  #remaining-display.danger { color: var(--red); }
+
+  /* ── Authorization table ─────────────────────────────────── */
+  .auth-status-active   { background: var(--green-bg); color: var(--green); }
+  .auth-status-expired  { background: #eef1f7;          color: var(--muted); }
+  .auth-status-utilized { background: var(--blue-bg);   color: var(--blue); }
+
+  .remaining-bar-wrap {
+    background: #e8edf5;
+    border-radius: 3px;
+    height: 6px;
+    width: 80px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 4px;
+    overflow: hidden;
+  }
+
+  .remaining-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--green);
+    display: block;
+  }
+
+  /* expire button */
+  .btn-expire {
+    font-size: 11px;
+    padding: 4px 10px;
+    background: var(--red-bg);
+    color: var(--red);
+    border: 1px solid #e8b4b0;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .btn-expire:hover {
+    background: var(--red);
+    color: var(--white);
+  }
+
+  /* ── Activity log ────────────────────────────────────────── */
+  .log-action {
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    background: #eef1f7;
+    color: var(--navy);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 700;
+  }
+
+  /* ── Active Authorization Banner ────────────────────────── */
+  .active-auth-banner {
+    background: linear-gradient(135deg, #0d2b55 0%, #1a4a8a 100%);
+    border: 2px solid var(--gold);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(13,43,85,.25);
+  }
+
+  .active-auth-banner.newly-created {
+    animation: auth-pulse 1.2s ease-out;
+  }
+
+  @keyframes auth-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(200,160,0,.7); }
+    60%  { box-shadow: 0 0 0 12px rgba(200,160,0,0); }
+    100% { box-shadow: 0 4px 16px rgba(13,43,85,.25); }
+  }
+
+  .active-auth-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .active-auth-icon {
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  .active-auth-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--gold-light);
+    margin-bottom: 3px;
+  }
+
+  .active-auth-id {
+    font-family: 'Courier New', monospace;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--white);
+    letter-spacing: .5px;
+  }
+
+  .active-auth-max {
+    font-size: 13px;
+    color: #9ab8d8;
+    margin-top: 3px;
+  }
+
+  .active-auth-max strong {
+    color: var(--gold-light);
+  }
+
+  .btn-copy-auth {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: var(--radius);
+    color: var(--white);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background .15s;
+    white-space: nowrap;
+  }
+
+  .btn-copy-auth:hover {
+    background: rgba(255,255,255,.2);
+  }
+
+  .btn-copy-auth.copied {
+    background: rgba(0,180,100,.3);
+    border-color: rgba(0,180,100,.5);
+    color: #80ffbc;
+  }
+
+  /* ── Two-column layout for the two forms ────────────────── */
+  .forms-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 860px) { .forms-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<h1 class="page-title">Reserve Governance</h1>
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 1: Reserve Status Panel
+   One card per active clearing cycle showing backing,
+   issued, available, and utilisation bar.
+   ══════════════════════════════════════════════════════════ #}
+{% if active_cycles %}
+  <div class="reserve-cards">
+    {% for cycle in active_cycles %}
+      {% if cycle.UtilizationPct < 70 %}
+        {% set bar_class = "green" %}
+      {% elif cycle.UtilizationPct < 90 %}
+        {% set bar_class = "amber" %}
+      {% else %}
+        {% set bar_class = "red" %}
+      {% endif %}
+      {% set avail_class = "green" if cycle.Available > 0 else "red" %}
+
+      <div class="reserve-card">
+        <div class="reserve-card-header">
+          <span class="reserve-card-title">{{ cycle.ClearingCycleID }}</span>
+          <span class="badge badge-green" style="font-size:10px">Active</span>
+        </div>
+        <div class="reserve-card-body">
+
+          {% if not cycle.USDBackingAmount %}
+            <div class="no-backing-msg">
+              &#9888;&nbsp; No USD backing confirmed for this cycle yet
+            </div>
+          {% endif %}
+
+          <div class="reserve-stat-row">
+            <div class="reserve-stat">
+              <div class="reserve-stat-value gold">
+                ${{ "{:,.2f}".format(cycle.USDBackingAmount or 0) }}
+              </div>
+              <div class="reserve-stat-label">USD Backing</div>
+            </div>
+            <div class="reserve-stat">
+              <div class="reserve-stat-value blue">
+                {{ "{:,.2f}".format(cycle.USDSTIssued or 0) }}
+              </div>
+              <div class="reserve-stat-label">USDST Issued</div>
+            </div>
+            <div class="reserve-stat">
+              <div class="reserve-stat-value {{ avail_class }}">
+                {{ "{:,.2f}".format(cycle.Available) }}
+              </div>
+              <div class="reserve-stat-label">Available</div>
+            </div>
+          </div>
+
+          <div class="util-row">
+            <div class="progress-wrap" style="flex:1">
+              <div class="progress-fill {{ bar_class }}"
+                   style="width:{{ [cycle.UtilizationPct, 100]|min }}%">
+              </div>
+            </div>
+            <span class="util-pct-label {{ bar_class }}">
+              {{ cycle.UtilizationPct }}%
+            </span>
+          </div>
+
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card">
+    <div class="empty-state">
+      No active clearing cycles found.
+      <a href="{{ url_for('clearing') }}">Create one on the Clearing Setup screen.</a>
+    </div>
+  </div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 1b: Active Authorization Banner
+   Shown whenever an Active authorization exists for any
+   active cycle. Highlighted on first creation via new_ia param.
+   ══════════════════════════════════════════════════════════ #}
+{% set active_auth_list = authorizations | selectattr('Status', 'equalto', 'Active') | list %}
+{% if active_auth_list %}
+  {% set aa = active_auth_list[0] %}
+  {% set new_ia = request.args.get('new_ia', '') %}
+  <div class="active-auth-banner{% if new_ia == aa.IssuanceAuthorizationID %} newly-created{% endif %}"
+       id="active-auth-banner">
+    <div class="active-auth-banner-left">
+      <div class="active-auth-icon">&#128274;</div>
+      <div>
+        <div class="active-auth-label">Active Authorization</div>
+        <div class="active-auth-id">{{ aa.IssuanceAuthorizationID }}</div>
+        <div class="active-auth-max">
+          Maximum:&nbsp;<strong>${{ "{:,.2f}".format(aa.MaximumIssuableAmount) }}</strong>
+          &nbsp;&middot;&nbsp;
+          Cycle:&nbsp;<strong>{{ aa.ClearingCycleID }}</strong>
+        </div>
+      </div>
+    </div>
+    <button class="btn-copy-auth" id="copy-ia-btn"
+            onclick="copyAuthID('{{ aa.IssuanceAuthorizationID }}')">
+      &#128203; Copy to clipboard
+    </button>
+  </div>
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════
+   SECTIONS 2 + 3: The two forms side by side
+   ══════════════════════════════════════════════════════════ #}
+<div class="forms-grid">
+
+  {# ── Section 2: Confirm USD Backing ─────────────────────── #}
+  <div class="card">
+    <div class="card-title">Confirm USD Backing</div>
+
+    <div class="info-box blue">
+      <span class="info-box-icon">&#9432;</span>
+      <span>
+        The Treasury Manager manually confirms the USD backing available for each
+        clearing cycle. This entry creates the official backing record.
+        <strong>Issuance cannot exceed this amount.</strong>
+      </span>
+    </div>
+
+    <form method="POST" action="{{ url_for('reserve_set_backing') }}">
+      <div class="form-group" style="margin-bottom:12px">
+        <label for="backing-cycle-select">Clearing Cycle</label>
+        <select id="backing-cycle-select" name="cycle_id" required>
+          <option value="">— Select active cycle —</option>
+          {% for cycle in active_cycles %}
+            <option value="{{ cycle.ClearingCycleID }}"
+              {% if selected_cycle_id == cycle.ClearingCycleID %}selected{% endif %}>
+              {{ cycle.ClearingCycleID }}
+              {% if cycle.USDBackingAmount %}
+                (current: ${{ "{:,.0f}".format(cycle.USDBackingAmount) }})
+              {% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom:16px">
+        <label for="backing-amount">USD Backing Amount</label>
+        <input
+          type="number"
+          id="backing-amount"
+          name="backing_amount"
+          min="0.01"
+          step="0.01"
+          placeholder="Enter confirmed USD amount"
+          required
+        />
+        <span class="helper-text">
+          This amount represents confirmed USD held in reserve for this settlement cycle.
+        </span>
+      </div>
+
+      <button type="submit" class="btn btn-navy">
+        &#10003; Confirm USD Backing
+      </button>
+    </form>
+  </div>
+
+  {# ── Section 3: Create Issuance Authorization ────────────── #}
+  <div class="card">
+    <div class="card-title">Create Issuance Authorization</div>
+
+    <div class="info-box gold">
+      <span class="info-box-icon">&#9733;</span>
+      <span>
+        Authorization is <strong>created and activated in a single action</strong>.
+        Once active, issuance up to the maximum amount is permitted.
+        No separate activation step is required.
+      </span>
+    </div>
+
+    {# Build a JS-readable map of cycle available capacities #}
+    {% set cycles_with_backing = active_cycles | selectattr("USDBackingAmount") | list %}
+
+    <form method="POST" action="{{ url_for('reserve_create_authorization') }}">
+      <div class="form-group" style="margin-bottom:12px">
+        <label for="auth-cycle-select">Clearing Cycle</label>
+        <select id="auth-cycle-select" name="cycle_id"
+                onchange="updateRemaining()" required>
+          <option value="" data-available="0">— Select cycle —</option>
+          {% for cycle in cycles_with_backing %}
+            <option
+              value="{{ cycle.ClearingCycleID }}"
+              data-available="{{ cycle.Available }}"
+              {% if selected_cycle_id == cycle.ClearingCycleID %}selected{% endif %}
+            >
+              {{ cycle.ClearingCycleID }}
+              (Available: ${{ "{:,.2f}".format(cycle.Available) }})
+            </option>
+          {% endfor %}
+        </select>
+        {% if not cycles_with_backing %}
+          <span class="helper-text" style="color:var(--amber)">
+            No cycles with confirmed USD backing yet.
+            Confirm backing above first.
+          </span>
+        {% endif %}
+      </div>
+
+      <div class="form-group" style="margin-bottom:16px">
+        <label for="max-issuable">Maximum Issuable Amount (USDST)</label>
+        <input
+          type="number"
+          id="max-issuable"
+          name="max_issuable"
+          min="0.01"
+          step="0.01"
+          placeholder="Maximum USDST to authorize"
+          oninput="updateRemaining()"
+          required
+        />
+        <span class="helper-text">Cannot exceed available capacity for the selected cycle.</span>
+        <div id="remaining-display"></div>
+      </div>
+
+      <button type="submit" class="btn btn-gold"
+              style="font-size:14px; padding:10px 20px">
+        &#9654; Create &amp; Activate Authorization
+      </button>
+    </form>
+  </div>
+
+</div>{# /forms-grid #}
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 4: Active Authorizations Table
+   Shows all authorizations with inline mini bar and
+   an Expire button for Active ones.
+   ══════════════════════════════════════════════════════════ #}
+<div class="card">
+  <div class="card-title" style="margin-bottom:14px">
+    Issuance Authorizations
+    <span style="font-weight:400; font-size:12px; margin-left:8px; color:var(--muted)">
+      ({{ authorizations | length }} total)
+    </span>
+  </div>
+
+  {% if authorizations %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Authorization ID</th>
+          <th>Cycle</th>
+          <th style="text-align:right">Maximum</th>
+          <th style="text-align:right">Issued</th>
+          <th>Remaining</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th style="text-align:center">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for auth in authorizations %}
+          {% set remaining = auth.MaximumIssuableAmount - auth.AmountIssued %}
+          {% set rem_pct   = ((auth.MaximumIssuableAmount - auth.AmountIssued) /
+                               auth.MaximumIssuableAmount * 100) | round(0)
+                             if auth.MaximumIssuableAmount > 0 else 0 %}
+        <tr>
+          <td style="font-family:monospace; font-weight:700; font-size:12px">
+            {{ auth.IssuanceAuthorizationID }}
+          </td>
+          <td style="font-family:monospace; font-size:12px">
+            {{ auth.ClearingCycleID }}
+          </td>
+          <td style="text-align:right; font-family:monospace; font-size:13px; font-weight:700">
+            ${{ "{:,.2f}".format(auth.MaximumIssuableAmount) }}
+          </td>
+          <td style="text-align:right; font-family:monospace; font-size:13px">
+            {{ "{:,.2f}".format(auth.AmountIssued) }}
+          </td>
+          <td>
+            <span style="font-family:monospace; font-size:12px; font-weight:700">
+              {{ "{:,.2f}".format(remaining) }}
+            </span>
+            <span class="remaining-bar-wrap">
+              <span class="remaining-bar-fill" style="width:{{ [rem_pct,100]|min }}%"></span>
+            </span>
+          </td>
+          <td>
+            {% if auth.Status == 'Active' %}
+              <span class="badge auth-status-active">Active</span>
+            {% elif auth.Status == 'Expired' %}
+              <span class="badge auth-status-expired">Expired</span>
+            {% elif auth.Status == 'FullyUtilized' %}
+              <span class="badge auth-status-utilized">Fully Utilized</span>
+            {% else %}
+              <span class="badge badge-muted">{{ auth.Status }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px; color:var(--muted)">
+            {{ auth.CreatedAt[:16].replace('T',' ') if auth.CreatedAt else '—' }}
+          </td>
+          <td style="text-align:center">
+            {% if auth.Status == 'Active' %}
+              <form method="POST" action="{{ url_for('reserve_expire_authorization') }}"
+                    onsubmit="return confirm('Expire authorization {{ auth.IssuanceAuthorizationID }}? This cannot be undone.')">
+                <input type="hidden" name="ia_id" value="{{ auth.IssuanceAuthorizationID }}" />
+                <button type="submit" class="btn-expire">Expire</button>
+              </form>
+            {% elif auth.Status == 'FullyUtilized' %}
+              <span class="badge auth-status-utilized" style="font-size:10px">Fully Utilized</span>
+            {% else %}
+              <span style="color:var(--muted); font-size:12px">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty-state">
+      No authorizations created yet.<br>
+      <span style="font-size:12px">
+        Confirm USD backing for a cycle, then create an authorization above.
+      </span>
+    </div>
+  {% endif %}
+</div>
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 5: Reserve Activity Log
+   Last 10 audit entries matching USD_Backing or
+   Issuance_Authorization actions.
+   ══════════════════════════════════════════════════════════ #}
+{% if reserve_log %}
+<div class="card">
+  <div class="card-title" style="margin-bottom:14px">Reserve Activity Log</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Action</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in reserve_log %}
+      <tr>
+        <td style="font-size:12px; color:var(--muted); white-space:nowrap">
+          {{ entry.Timestamp[:19].replace('T',' ') if entry.Timestamp else '—' }}
+        </td>
+        <td>
+          <span class="log-action">{{ entry.Action }}</span>
+        </td>
+        <td style="font-size:12px; color:var(--text)">
+          {{ entry.Details }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+
+{# ── JavaScript: live remaining capacity calculator ──────── #}
+<script>
+  function updateRemaining() {
+    const select  = document.getElementById('auth-cycle-select');
+    const input   = document.getElementById('max-issuable');
+    const display = document.getElementById('remaining-display');
+
+    const selectedOpt = select.options[select.selectedIndex];
+    const available   = parseFloat(selectedOpt.dataset.available || '0');
+    const requested   = parseFloat(input.value) || 0;
+
+    if (!select.value || requested <= 0) {
+      display.textContent = '';
+      return;
+    }
+
+    const remaining = available - requested;
+
+    if (remaining < 0) {
+      display.textContent =
+        '⚠ Exceeds available capacity by $' +
+        Math.abs(remaining).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      display.className = 'danger';
+    } else if (remaining === 0) {
+      display.textContent = 'Full capacity authorised — $0.00 remaining';
+      display.className = 'warn';
+    } else {
+      display.textContent =
+        'Remaining after this authorization: $' +
+        remaining.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      display.className = remaining < available * 0.1 ? 'warn' : 'ok';
+    }
+  }
+
+  /* Run once on load to handle pre-selected cycle from ?cycle= param */
+  document.addEventListener('DOMContentLoaded', updateRemaining);
+
+  function copyAuthID(id) {
+    navigator.clipboard.writeText(id).then(() => {
+      const btn = document.getElementById('copy-ia-btn');
+      btn.textContent = '\u2713 Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.innerHTML = '&#128203; Copy to clipboard';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+</script>
+{% endblock %}

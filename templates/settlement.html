@@ -1,0 +1,1073 @@
+{% extends "base.html" %}
+
+{% block title %}Settlement Execution — La Poste CI Settlement{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Summary bar ─────────────────────────────────────────── */
+  .summary-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    background: var(--navy-dark);
+    border-radius: var(--radius);
+    border: 1px solid var(--navy-mid);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .summary-item {
+    padding: 14px 18px;
+    border-right: 1px solid rgba(255,255,255,.1);
+    text-align: center;
+  }
+
+  .summary-item:last-child { border-right: none; }
+
+  .summary-value {
+    font-size: 22px;
+    font-weight: 800;
+    font-family: 'Courier New', monospace;
+    line-height: 1.1;
+    color: var(--white);
+  }
+
+  .summary-value.red   { color: #ff8080; }
+  .summary-value.green { color: #7eff9e; }
+  .summary-value.gold  { color: var(--gold-light); }
+
+  .summary-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #8fa8c8;
+    margin-top: 4px;
+  }
+
+  @media (max-width: 760px) {
+    .summary-bar { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* ── Section headings ────────────────────────────────────── */
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .section-head-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy-dark);
+  }
+
+  .direction-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+
+  .pill-payable    { background: var(--red-bg);   color: var(--red); }
+  .pill-receivable { background: var(--green-bg); color: var(--green); }
+
+  /* ── Obligation cards ────────────────────────────────────── */
+  .obligation-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .obligation-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--border);
+    overflow: hidden;
+  }
+
+  .obligation-card.payable     { border-left-color: var(--red); }
+  .obligation-card.receivable  { border-left-color: var(--green); }
+  .obligation-card.carry-fwd   { border-left-color: var(--amber); }
+  .obligation-card.settled     { border-left-color: #aaa; opacity: .85; }
+
+  .obligation-card-header {
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    background: var(--off-white);
+  }
+
+  .obligation-left  { display: flex; flex-direction: column; gap: 4px; }
+  .obligation-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+  .counterparty-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--navy-dark);
+  }
+
+  .obligation-cycle {
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    color: var(--muted);
+  }
+
+  .obligation-link {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .obligation-amount {
+    font-size: 24px;
+    font-weight: 900;
+    font-family: 'Courier New', monospace;
+    line-height: 1;
+  }
+
+  .amount-payable    { color: var(--red); }
+  .amount-receivable { color: var(--green); }
+
+  .obligation-amount-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* ── Settlement form inside card ─────────────────────────── */
+  .settlement-form-body {
+    padding: 18px;
+  }
+
+  .form-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 600px) { .form-two-col { grid-template-columns: 1fr; } }
+
+  .form-group-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .form-group-inline label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+  }
+
+  .input-with-btn {
+    display: flex;
+    gap: 6px;
+  }
+
+  .input-with-btn input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .input-with-btn input:focus {
+    outline: none;
+    border-color: var(--navy);
+    box-shadow: 0 0 0 3px rgba(13,43,85,.1);
+  }
+
+  .gen-btn {
+    background: var(--off-white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .gen-btn:hover { background: var(--navy); color: var(--white); }
+
+  /* Settlement type radios */
+  .stype-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    align-items: center;
+  }
+
+  .stype-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .radio-option input[type="radio"] {
+    accent-color: var(--navy);
+    width: 15px;
+    height: 15px;
+  }
+
+  /* Partial amount block */
+  .partial-block {
+    display: none;
+    background: #fff8e1;
+    border: 1px solid #f0d880;
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .partial-block.visible { display: block; }
+
+  .partial-block input {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 13px;
+    width: 100%;
+    margin-top: 6px;
+    margin-bottom: 8px;
+  }
+
+  .partial-calc {
+    font-size: 12px;
+    color: var(--amber);
+    font-weight: 600;
+    min-height: 18px;
+  }
+
+  .carry-fwd-note {
+    font-size: 11px;
+    color: #7a5300;
+    margin-top: 4px;
+    padding: 5px 8px;
+    background: #fff3cd;
+    border-radius: 3px;
+  }
+
+  /* Submit bar */
+  .form-submit-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .xrpl-warning {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* Settled state display */
+  .settled-info {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .tx-hash-small {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Inbound status form ─────────────────────────────────── */
+  .inbound-form-body {
+    padding: 14px 18px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .inbound-form-body select,
+  .inbound-form-body input[type="text"] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .inbound-form-body select { width: 180px; }
+  .inbound-form-body input[type="text"] { flex: 1; min-width: 140px; }
+
+  /* ── Transaction log ─────────────────────────────────────── */
+  tr.partial-row td { background: #fffce8; }
+
+  .hash-mono {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Loading overlay (XRPL wait) ─────────────────────────── */
+  #xrpl-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(7,26,54,.6);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 16px;
+    color: var(--white);
+  }
+
+  #xrpl-overlay.visible { display: flex; }
+
+  .overlay-spinner {
+    width: 40px; height: 40px;
+    border: 4px solid rgba(255,255,255,.3);
+    border-top-color: var(--gold-light);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .overlay-msg {
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: .3px;
+  }
+
+  .overlay-sub {
+    font-size: 12px;
+    color: #9db3cc;
+  }
+
+  /* ── Amber submit button (simulated inbound) ─────────────── */
+  .btn-amber {
+    background: var(--amber);
+    color: var(--white);
+  }
+
+  /* ── Simulation section inside receivable cards ──────────── */
+  .sim-divider {
+    border: none;
+    border-top: 1px dashed #d8c89a;
+    margin: 0 18px;
+  }
+
+  .sim-section {
+    padding: 14px 18px 16px;
+    background: #fffbf0;
+  }
+
+  .sim-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .sim-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7a5300;
+  }
+
+  .poc-badge {
+    background: var(--amber-bg);
+    color: var(--amber);
+    border: 1px solid #f0c080;
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+  }
+
+  .sim-desc {
+    font-size: 12px;
+    color: #7a5300;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  .sim-warning {
+    font-size: 11px;
+    color: var(--amber);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  .inbound-confirmed-strip {
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+    background: #f6fdf9;
+  }
+
+  /* ── Auto-refresh banner ─────────────────────────────────── */
+  #refresh-banner {
+    display: none;
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid #a0d8b8;
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+</style>
+{% endblock %}
+
+
+{% block content %}
+
+<!-- XRPL processing overlay -->
+<div id="xrpl-overlay">
+  <div class="overlay-spinner"></div>
+  <div class="overlay-msg">Submitting to XRPL Testnet…</div>
+  <div class="overlay-sub">Waiting for ledger finality — this takes 3–5 seconds</div>
+</div>
+
+<!-- Auto-refresh banner -->
+<div id="refresh-banner">
+  Refreshing in <span id="countdown">3</span>s to show updated records…
+</div>
+
+<h1 class="page-title">Settlement Execution</h1>
+
+{% include 'comparison_panel.html' %}
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 1: Settlement Overview
+   Summary counts/totals for all active cycle records.
+   ══════════════════════════════════════════════════════════ #}
+<div class="summary-bar">
+  <div class="summary-item">
+    <div class="summary-value gold">{{ summary.total_count }}</div>
+    <div class="summary-label">Total Obligations</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-value red">
+      {{ "{:,.2f}".format(summary.payable_total) }}
+    </div>
+    <div class="summary-label">Payable (USDST)</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-value green">
+      {{ "{:,.2f}".format(summary.receivable_total) }}
+    </div>
+    <div class="summary-label">Receivable (USDST)</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-value gold">{{ summary.settled_count }}</div>
+    <div class="summary-label">Settled</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-value" style="color:#ffb347">{{ summary.pending_count }}</div>
+    <div class="summary-label">Pending</div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 2: Outbound Obligations (Payable)
+   La Poste CI owes counterparties.
+   Pending records show the full settlement form.
+   Settled records show a confirmation strip.
+   ══════════════════════════════════════════════════════════ #}
+<div class="section-head">
+  <span class="section-head-title">Outbound Obligations</span>
+  <span class="direction-pill pill-payable">Payable — La Poste CI pays</span>
+  <span class="badge badge-muted">{{ payable_records | length }} records</span>
+</div>
+
+{% if payable_records %}
+<div class="obligation-cards">
+  {% for rec in payable_records %}
+    {% set is_carry = rec.PartialCarryForwardFlag == 'Y' %}
+    {% set card_class = 'settled' if rec.Status in ('Settled','Reconciled')
+                        else ('carry-fwd' if is_carry else 'payable') %}
+    <div class="obligation-card {{ card_class }}">
+
+      {# Card header — always shown #}
+      <div class="obligation-card-header">
+        <div class="obligation-left">
+          <span class="counterparty-name">{{ rec.CounterpartyLabel }}</span>
+          <span class="obligation-cycle">{{ rec.ClearingCycleID }}</span>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px">
+            <span class="badge badge-muted" style="font-size:10px">
+              {{ rec.SettlementRecordID }}
+            </span>
+            {% if is_carry %}
+              <span class="badge"
+                    style="background:var(--amber-bg);color:var(--amber);font-size:10px">
+                Carry-Forward
+              </span>
+            {% endif %}
+            {% if rec.LinkedSettlementRecordID %}
+              <span class="obligation-link">
+                Linked to: {{ rec.LinkedSettlementRecordID }}
+              </span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="obligation-right">
+          <span class="obligation-amount amount-payable">
+            {{ "{:,.2f}".format(rec.Amount) }}
+          </span>
+          <span class="obligation-amount-label">USDST Payable</span>
+          {# Status badge #}
+          {% if rec.Status == 'Pending_Settlement' %}
+            <span class="badge" style="background:var(--amber-bg);color:var(--amber)">
+              Pending
+            </span>
+          {% elif rec.Status == 'Settled' %}
+            <span class="badge badge-green">Settled</span>
+          {% elif rec.Status == 'Partially_Settled' %}
+            <span class="badge"
+                  style="background:#fff8e1;color:#7a5700">
+              Partially Settled
+            </span>
+          {% elif rec.Status == 'Reconciled' %}
+            <span class="badge badge-blue"
+                  style="background:var(--blue-bg);color:var(--blue)">
+              Reconciled
+            </span>
+          {% elif rec.Status == 'Exception' %}
+            <span class="badge"
+                  style="background:var(--red-bg);color:var(--red)">
+              Exception
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Settlement form — only for Pending_Settlement #}
+      {% if rec.Status == 'Pending_Settlement' %}
+      <div class="settlement-form-body">
+        <form method="POST" action="{{ url_for('settlement_execute') }}"
+              onsubmit="return handleSettlementSubmit(this, '{{ rec.SettlementRecordID }}', {{ rec.Amount }})">
+          <input type="hidden" name="settlement_record_id"
+                 value="{{ rec.SettlementRecordID }}" />
+
+          <div class="form-two-col">
+            <div class="form-group-inline">
+              <label>Payment Instruction ID</label>
+              <div class="input-with-btn">
+                <input type="text"
+                       name="payment_instruction_id"
+                       id="pi-{{ rec.SettlementRecordID }}"
+                       placeholder="PI_77102"
+                       maxlength="20"
+                       required />
+                <button type="button" class="gen-btn"
+                        onclick="genId('pi-{{ rec.SettlementRecordID }}', 'PI_')">
+                  Auto
+                </button>
+              </div>
+            </div>
+            <div class="form-group-inline">
+              <label>Treasury Approval ID</label>
+              <div class="input-with-btn">
+                <input type="text"
+                       name="treasury_approval_id"
+                       id="ta-{{ rec.SettlementRecordID }}"
+                       placeholder="TA_88421"
+                       maxlength="20"
+                       required />
+                <button type="button" class="gen-btn"
+                        onclick="genTa('ta-{{ rec.SettlementRecordID }}')">
+                  Generate
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {# Settlement type #}
+          <span class="stype-label">Settlement Type</span>
+          <div class="stype-row">
+            <label class="radio-option">
+              <input type="radio"
+                     name="settlement_type"
+                     value="full"
+                     checked
+                     onchange="togglePartial('{{ rec.SettlementRecordID }}', false)" />
+              Full Settlement
+              (${{ "{:,.2f}".format(rec.Amount) }})
+            </label>
+            <label class="radio-option">
+              <input type="radio"
+                     name="settlement_type"
+                     value="partial"
+                     onchange="togglePartial('{{ rec.SettlementRecordID }}', true)" />
+              Partial Settlement
+            </label>
+          </div>
+
+          {# Partial amount block #}
+          <div class="partial-block" id="partial-{{ rec.SettlementRecordID }}">
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;
+                          letter-spacing:.4px;color:var(--muted)">
+              Amount to Settle Now (USDST)
+            </label>
+            <input type="number"
+                   name="partial_amount"
+                   id="pamt-{{ rec.SettlementRecordID }}"
+                   min="0.01"
+                   step="0.01"
+                   max="{{ rec.Amount - 0.01 }}"
+                   placeholder="0.00"
+                   oninput="updatePartialCalc('{{ rec.SettlementRecordID }}', {{ rec.Amount }})" />
+            <div class="partial-calc"
+                 id="pcalc-{{ rec.SettlementRecordID }}"></div>
+            <div class="carry-fwd-note">
+              A new carry-forward settlement record will be created automatically
+              for the remaining amount.
+            </div>
+          </div>
+
+          <div class="form-submit-bar">
+            <div>
+              <button type="submit" class="btn btn-gold"
+                      style="font-size:13px; padding:9px 20px">
+                &#9654; Execute Settlement on XRPL
+              </button>
+            </div>
+            <span class="xrpl-warning">
+              &#9888; This will execute a real XRPL testnet transaction.
+              Confirm all details before submitting.
+            </span>
+          </div>
+
+        </form>
+      </div>
+      {% endif %}
+
+      {# Settled — show confirmation info strip #}
+      {% if rec.Status == 'Settled' or rec.Status == 'Reconciled' %}
+        <div class="settled-info">
+          <span class="badge badge-green">&#10003; Settled on XRPL</span>
+          {# Find the related tx hash from recent_txs if available #}
+          {% set matched_tx = recent_txs
+               | selectattr("ClearingCycleID", "equalto", rec.ClearingCycleID)
+               | list %}
+          {% if matched_tx %}
+            {% set tx = matched_tx[0] %}
+            <span class="tx-hash-small">{{ tx.TxHash[:12] }}…</span>
+            <a href="{{ explorer_base }}{{ tx.TxHash }}"
+               target="_blank" rel="noopener"
+               style="font-size:12px">View ↗</a>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# Partially settled — link to carry-forward #}
+      {% if rec.Status == 'Partially_Settled' %}
+        <div class="settled-info">
+          <span class="badge"
+                style="background:#fff8e1;color:#7a5700">
+            &#8644; Partially Settled
+          </span>
+          <span style="font-size:12px; color:var(--muted)">
+            Carry-forward record created automatically for remaining amount.
+          </span>
+        </div>
+      {% endif %}
+
+    </div>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="card">
+    <div class="empty-state">No outbound (Payable) obligations found.</div>
+  </div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 3: Inbound Obligations (Receivable)
+   Counterparties owe La Poste CI. Treasury Manager
+   manually tracks receipt status via the dropdown.
+   ══════════════════════════════════════════════════════════ #}
+<div class="section-head">
+  <span class="section-head-title">Inbound Obligations</span>
+  <span class="direction-pill pill-receivable">Receivable — La Poste CI receives</span>
+  <span class="badge badge-muted">{{ receivable_records | length }} records</span>
+</div>
+
+{% if receivable_records %}
+<div class="obligation-cards">
+  {% for rec in receivable_records %}
+    {% set card_class = 'settled' if rec.Status in ('Settled','Reconciled') else 'receivable' %}
+    <div class="obligation-card {{ card_class }}">
+
+      <div class="obligation-card-header">
+        <div class="obligation-left">
+          <span class="counterparty-name">{{ rec.CounterpartyLabel }}</span>
+          <span class="obligation-cycle">{{ rec.ClearingCycleID }}</span>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px">
+            <span class="badge badge-muted" style="font-size:10px">
+              {{ rec.SettlementRecordID }}
+            </span>
+          </div>
+        </div>
+        <div class="obligation-right">
+          <span class="obligation-amount amount-receivable">
+            {{ "{:,.2f}".format(rec.Amount) }}
+          </span>
+          <span class="obligation-amount-label">USDST Receivable</span>
+          {% if rec.Status == 'Settled' or rec.Status == 'Reconciled' %}
+            <span class="badge badge-green">&#10003; Received</span>
+          {% elif rec.Status == 'Partially_Settled' %}
+            <span class="badge"
+                  style="background:#fff8e1;color:#7a5700">
+              Partial Receipt
+            </span>
+          {% elif rec.Status == 'Exception' %}
+            <span class="badge"
+                  style="background:var(--red-bg);color:var(--red)">
+              Exception
+            </span>
+          {% else %}
+            <span class="badge"
+                  style="background:var(--amber-bg);color:var(--amber)">
+              Pending
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      {# ── Inbound section: pending or settled ───────────── #}
+      {% if rec.Status not in ('Settled', 'Reconciled') %}
+
+        {# Status update dropdown (kept as-is) #}
+        <form method="POST"
+              action="{{ url_for('settlement_update_inbound') }}">
+          <input type="hidden" name="settlement_record_id"
+                 value="{{ rec.SettlementRecordID }}" />
+          <div class="inbound-form-body">
+            <div>
+              <label style="font-size:11px;font-weight:700;text-transform:uppercase;
+                            letter-spacing:.4px;color:var(--muted);display:block;
+                            margin-bottom:4px">Receipt Status</label>
+              <select name="new_status">
+                <option value="Not_Received"
+                  {% if rec.Status == 'Pending_Settlement' %}selected{% endif %}>
+                  Not Received
+                </option>
+                <option value="In_Transit">In Transit</option>
+                <option value="Partial_Received"
+                  {% if rec.Status == 'Partially_Settled' %}selected{% endif %}>
+                  Partial Received
+                </option>
+                <option value="Exception"
+                  {% if rec.Status == 'Exception' %}selected{% endif %}>
+                  Exception
+                </option>
+              </select>
+            </div>
+            <div style="flex:1">
+              <label style="font-size:11px;font-weight:700;text-transform:uppercase;
+                            letter-spacing:.4px;color:var(--muted);display:block;
+                            margin-bottom:4px">Notes (optional)</label>
+              <input type="text" name="notes"
+                     placeholder="Reference, SWIFT code, notes…"
+                     maxlength="200" />
+            </div>
+            <button type="submit" class="btn btn-navy"
+                    style="font-size:12px; padding:7px 16px; align-self:flex-end">
+              Update Status
+            </button>
+          </div>
+        </form>
+
+        {# ── Simulation section ──────────────────────────── #}
+        <hr class="sim-divider" />
+        <div class="sim-section">
+          <div class="sim-header">
+            <span class="sim-title">Demo: Simulate Counterparty Payment</span>
+            <span class="poc-badge">PoC Simulation</span>
+          </div>
+          <p class="sim-desc">
+            In production, <strong>{{ rec.CounterpartyLabel }}</strong> would execute
+            this payment from their system. This button simulates that action for
+            demo purposes.
+          </p>
+          <form method="POST"
+                action="{{ url_for('settlement_simulate_inbound') }}"
+                onsubmit="document.getElementById('xrpl-overlay').classList.add('visible'); return true;">
+            <input type="hidden" name="settlement_record_id"
+                   value="{{ rec.SettlementRecordID }}" />
+            <div class="form-two-col" style="max-width:480px; margin-bottom:10px">
+              <div class="form-group-inline">
+                <label>Treasury Approval ID</label>
+                <div class="input-with-btn">
+                  <input type="text"
+                         name="treasury_approval_id"
+                         id="sim-ta-{{ rec.SettlementRecordID }}"
+                         placeholder="TA_88421"
+                         maxlength="20"
+                         required />
+                  <button type="button" class="gen-btn"
+                          onclick="genTa('sim-ta-{{ rec.SettlementRecordID }}')">
+                    Generate
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-amber"
+                    style="font-size:13px; padding:9px 18px">
+              &#9654; Simulate Inbound Payment from {{ rec.CounterpartyLabel }}
+            </button>
+            <div class="sim-warning">
+              &#9888; This executes a real XRPL transaction from
+              {{ rec.CounterpartyLabel }} wallet to La Poste CI treasury.
+            </div>
+          </form>
+        </div>
+
+      {% else %}
+        {# Settled — show confirmation with inbound tx details if available #}
+        {% set inbound_tx = inbound_txs_by_sr.get(rec.SettlementRecordID) %}
+        <div class="inbound-confirmed-strip">
+          <span class="badge badge-green">&#10003; Receipt Confirmed</span>
+          {% if inbound_tx %}
+            <span class="tx-hash-small">{{ inbound_tx.TxHash[:12] }}…</span>
+            <a href="{{ explorer_base }}{{ inbound_tx.TxHash }}"
+               target="_blank" rel="noopener"
+               style="font-size:12px">View ↗</a>
+            <span class="poc-badge">Simulated for PoC</span>
+          {% endif %}
+        </div>
+      {% endif %}
+
+    </div>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="card">
+    <div class="empty-state">No inbound (Receivable) obligations found.</div>
+  </div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════
+   SECTION 4: Settlement Transaction Log
+   All Settlement + PartialSettlement XRPL transactions.
+   PartialSettlement rows get amber background.
+   ══════════════════════════════════════════════════════════ #}
+<div class="card">
+  <div class="card-title" style="margin-bottom:14px">
+    Settlement Transaction Log
+    <span style="font-weight:400;font-size:12px;color:var(--muted);margin-left:6px">
+      ({{ recent_txs | length }} records)
+    </span>
+  </div>
+
+  {% if recent_txs %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Cycle</th>
+          <th>From</th>
+          <th>To</th>
+          <th style="text-align:right">Amount</th>
+          <th>Payment Instr.</th>
+          <th>Tx Hash</th>
+          <th>Explorer</th>
+          <th>Confirmed At</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tx in recent_txs %}
+        <tr class="{{ 'partial-row' if tx.TransactionType == 'PartialSettlement' else '' }}">
+          <td>
+            {% if tx.TransactionType == 'Settlement' %}
+              <span class="badge badge-green">Settlement</span>
+            {% elif tx.TransactionType == 'PartialSettlement' %}
+              <span class="badge"
+                    style="background:#fff8e1;color:#7a5700">
+                Partial
+              </span>
+            {% else %}
+              <span class="badge badge-muted">{{ tx.TransactionType }}</span>
+            {% endif %}
+          </td>
+          <td style="font-family:monospace;font-size:12px">
+            {{ tx.ClearingCycleID or '—' }}
+          </td>
+          <td class="hash-mono">
+            {{ tx.FromWallet[:8] ~ '…' if tx.FromWallet else '—' }}
+          </td>
+          <td class="hash-mono">
+            {{ tx.ToWallet[:8] ~ '…' if tx.ToWallet else '—' }}
+          </td>
+          <td style="text-align:right;font-family:monospace;font-weight:700;font-size:13px">
+            {{ "{:,.4f}".format(tx.Amount) }}
+          </td>
+          <td style="font-family:monospace;font-size:11px;color:var(--muted)">
+            {{ tx.PaymentInstructionID or '—' }}
+          </td>
+          <td class="hash-mono">
+            {{ tx.TxHash[:8] ~ '…' if tx.TxHash else '—' }}
+          </td>
+          <td>
+            {% if tx.TxHash %}
+              <a href="{{ explorer_base }}{{ tx.TxHash }}"
+                 target="_blank" rel="noopener"
+                 style="font-size:12px">View ↗</a>
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:11px;color:var(--muted);white-space:nowrap">
+            {{ tx.ConfirmedAt[:16].replace('T',' ') if tx.ConfirmedAt else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty-state">No settlement transactions yet.</div>
+  {% endif %}
+</div>
+
+
+{# ── JavaScript ──────────────────────────────────────────── #}
+<script>
+(function () {
+
+  /* ── Toggle partial amount block ──────────────────────── */
+  window.togglePartial = function (srId, show) {
+    var block = document.getElementById('partial-' + srId);
+    if (block) {
+      if (show) {
+        block.classList.add('visible');
+      } else {
+        block.classList.remove('visible');
+        var inp = document.getElementById('pamt-' + srId);
+        if (inp) inp.value = '';
+        var calc = document.getElementById('pcalc-' + srId);
+        if (calc) calc.textContent = '';
+      }
+    }
+  };
+
+  /* ── Live partial carry-forward calculation ───────────── */
+  window.updatePartialCalc = function (srId, fullAmount) {
+    var inp  = document.getElementById('pamt-' + srId);
+    var calc = document.getElementById('pcalc-' + srId);
+    if (!inp || !calc) return;
+    var partial   = parseFloat(inp.value) || 0;
+    var remaining = fullAmount - partial;
+    if (partial <= 0) {
+      calc.textContent = '';
+    } else if (partial >= fullAmount) {
+      calc.textContent = '⚠ Must be less than full amount. Use Full Settlement.';
+      calc.style.color = 'var(--red)';
+    } else {
+      calc.textContent =
+        'Remaining after this payment: ' +
+        remaining.toLocaleString('en-US', {minimumFractionDigits: 2}) +
+        ' USDST';
+      calc.style.color = 'var(--amber)';
+    }
+  };
+
+  /* ── Settlement submit handler ────────────────────────── */
+  window.handleSettlementSubmit = function (form, srId, fullAmount) {
+    var typeEl = form.querySelector('input[name="settlement_type"]:checked');
+    var stype  = typeEl ? typeEl.value : 'full';
+
+    if (stype === 'partial') {
+      var pamtEl   = document.getElementById('pamt-' + srId);
+      var partial  = parseFloat(pamtEl ? pamtEl.value : 0) || 0;
+      var remaining = fullAmount - partial;
+      if (partial <= 0 || partial >= fullAmount) {
+        alert('Partial amount must be greater than 0 and less than ' + fullAmount + ' USDST.');
+        return false;
+      }
+      var confirmed = confirm(
+        'You are settling ' +
+        partial.toLocaleString('en-US', {minimumFractionDigits: 2}) +
+        ' USDST of ' +
+        fullAmount.toLocaleString('en-US', {minimumFractionDigits: 2}) +
+        ' USDST total.\n\n' +
+        'A carry-forward record of ' +
+        remaining.toLocaleString('en-US', {minimumFractionDigits: 2}) +
+        ' USDST will be created automatically.\n\nContinue?'
+      );
+      if (!confirmed) return false;
+    }
+
+    /* Show XRPL overlay */
+    var overlay = document.getElementById('xrpl-overlay');
+    if (overlay) overlay.classList.add('visible');
+    return true;
+  };
+
+  /* ── Auto-refresh after success ───────────────────────── */
+  var successFlash = document.querySelector('.flash.success');
+  if (successFlash) {
+    var banner    = document.getElementById('refresh-banner');
+    var countdown = document.getElementById('countdown');
+    if (banner) {
+      banner.style.display = 'block';
+      var secs = 3;
+      var iv = setInterval(function () {
+        secs--;
+        if (countdown) countdown.textContent = secs;
+        if (secs <= 0) {
+          clearInterval(iv);
+          window.location.reload();
+        }
+      }, 1000);
+    }
+  }
+
+}());
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}{{ screen }} — La Poste CI Settlement{% endblock %}
+
+{% block content %}
+<h1 class="page-title">{{ screen }}</h1>
+<div class="card">
+  <div class="card-title">Under Construction</div>
+  <p style="color:var(--muted); font-size:14px; line-height:1.6">
+    {{ description }}<br><br>
+    This screen is scaffolded and ready for implementation.
+  </p>
+  <div style="margin-top:16px">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-navy">&larr; Back to Dashboard</a>
+  </div>
+</div>
+{% endblock %}

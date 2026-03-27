@@ -1,0 +1,519 @@
+{% extends "base.html" %}
+{% block title %}Audit Log — La Poste CI{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Badge: purple for authorization actions ──────────────────────────── */
+  .badge-purple { background: #f3e8ff; color: #6b21a8; }
+
+  /* ── Section 2: summary cards row ────────────────────────────────────── */
+  .audit-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 800px) { .audit-stats { grid-template-columns: 1fr 1fr; } }
+  .audit-stat-card {
+    padding: 18px 20px;
+    border-top-width: 3px;
+    border-top-style: solid;
+  }
+
+  /* ── Section 3: report panel three-column grid ────────────────────────── */
+  .report-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 28px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 960px) { .report-cols { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .report-cols { grid-template-columns: 1fr; } }
+
+  .kv { display: flex; justify-content: space-between; align-items: baseline;
+        padding: 7px 0; border-bottom: 1px solid #eef1f7; font-size: 13px; }
+  .kv:last-child { border-bottom: none; }
+  .kv-label { color: var(--muted); }
+  .kv-val   { font-weight: 700; color: var(--navy-dark); }
+
+  /* ── Fade-in animation for report panel ──────────────────────────────── */
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .fade-in { animation: fadeSlideIn .25s ease; }
+
+  /* ── Filter bar ───────────────────────────────────────────────────────── */
+  .filter-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .filter-bar select {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    min-width: 240px;
+  }
+
+  /* ── Section 4: details cell ellipsis ────────────────────────────────── */
+  .details-cell {
+    max-width: 380px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; font-size: 12px;
+  }
+
+  /* ── Pagination controls ──────────────────────────────────────────────── */
+  .pagination {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+  }
+  .pagination button:disabled { opacity: .35; cursor: default; }
+
+  /* ── Print stylesheet ─────────────────────────────────────────────────── */
+  @media print {
+    .site-header, .site-nav, .site-footer,
+    .no-print, .filter-bar-card { display: none !important; }
+    .fade-in  { animation: none; }
+    .card     { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+    body, html { background: white; }
+    .report-cols { grid-template-columns: 1fr 1fr 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 1 — Page header + filter bar
+   The filter bar is always visible. When a cycle is chosen the page reloads
+   with ?cycle=<id> which activates the report panel and scopes the table.
+   ══════════════════════════════════════════════════════════════════════════ #}
+
+<div style="display:flex; align-items:center; justify-content:space-between;
+            flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+  <h1 class="page-title" style="margin:0; border:none; padding:0;">
+    Audit Log and Settlement Reports
+  </h1>
+  {% if report %}
+  <button onclick="window.print()" class="btn btn-ghost no-print"
+          style="font-size:13px;">
+    Print Report
+  </button>
+  {% endif %}
+</div>
+
+<div class="card filter-bar-card no-print" style="margin-bottom:20px;">
+  <form class="filter-bar" method="GET" action="{{ url_for('audit_log_view') }}">
+    <label style="font-weight:600; font-size:13px; color:var(--muted); white-space:nowrap;">
+      Clearing Cycle
+    </label>
+    <select name="cycle">
+      <option value="">All Cycles</option>
+      {% for c in cycles %}
+      <option value="{{ c.ClearingCycleID }}"
+              {% if cycle_filter == c.ClearingCycleID %}selected{% endif %}>
+        {{ c.ClearingCycleID }} ({{ c.Status }})
+      </option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-navy">Apply Filter</button>
+    {% if cycle_filter %}
+    <a href="{{ url_for('audit_log_view') }}" class="btn btn-ghost">Clear</a>
+    <span class="badge badge-blue">{{ cycle_filter }}</span>
+    {% else %}
+    <a href="{{ url_for('audit_export_csv') }}"
+       class="btn btn-ghost" style="font-size:12px;">↓ Export All CSV</a>
+    {% endif %}
+  </form>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 2 — Activity summary cards
+   Four metric cards: total actions, actions today, cycles tracked, exceptions.
+   Hidden in report-only mode (printable report view).
+   ══════════════════════════════════════════════════════════════════════════ #}
+
+{% if not report_only %}
+<div class="audit-stats no-print">
+
+  <div class="card audit-stat-card" style="border-top-color: var(--muted);">
+    <div class="stat-value" style="color:var(--muted);">{{ stats.total_actions }}</div>
+    <div class="stat-label">Total Actions Logged</div>
+  </div>
+
+  <div class="card audit-stat-card" style="border-top-color: var(--blue);">
+    <div class="stat-value" style="color:var(--blue);">{{ stats.actions_today }}</div>
+    <div class="stat-label">Actions Today</div>
+  </div>
+
+  <div class="card audit-stat-card" style="border-top-color: var(--navy);">
+    <div class="stat-value" style="color:var(--navy);">{{ stats.cycles_tracked }}</div>
+    <div class="stat-label">Cycles Tracked</div>
+  </div>
+
+  <div class="card audit-stat-card"
+       style="border-top-color:{{ 'var(--red)' if stats.exceptions_logged > 0 else 'var(--border)' }};">
+    <div class="stat-value"
+         style="color:{{ 'var(--red)' if stats.exceptions_logged > 0 else 'var(--muted)' }};">
+      {{ stats.exceptions_logged }}
+    </div>
+    <div class="stat-label">Exceptions Logged</div>
+  </div>
+
+</div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 3 — Settlement Report Panel
+   Rendered only when a cycle is selected. The three-column grid covers:
+     Left   — Token Economics (backing, issued, redeemed, outstanding supply)
+     Middle — Settlement Performance (counts, percentages, progress bar)
+     Right  — Blockchain Summary (tx counts, reconciled, exceptions)
+   Export buttons trigger file downloads without reloading the page.
+   ══════════════════════════════════════════════════════════════════════════ #}
+
+{% if report %}
+<div class="card fade-in" style="border-top:3px solid var(--gold); margin-bottom:20px;">
+
+  {# Report header row #}
+  <div style="display:flex; align-items:baseline; flex-wrap:wrap; gap:12px;
+              margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--border);">
+    <span style="font-size:20px; font-weight:800; color:var(--navy-dark);">
+      {{ report.cycle_id }}
+    </span>
+    <span class="badge {{ 'badge-navy' if report.cycle_status == 'Closed' else 'badge-amber' }}">
+      {{ report.cycle_status }}
+    </span>
+    <span style="font-size:11px; color:var(--muted); margin-left:auto;" class="no-print">
+      Generated {{ report.generated_at }}
+    </span>
+  </div>
+
+  <div class="report-cols">
+
+    {# Left column: Token Economics #}
+    <div>
+      <div class="card-title">Token Economics</div>
+
+      <div class="kv">
+        <span class="kv-label">USD Backing Confirmed</span>
+        <span class="kv-val">${{ report.usd_backing_confirmed | money }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">USDST Issued</span>
+        <span class="kv-val">{{ report.usdst_issued | money }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">USDST Redeemed</span>
+        <span class="kv-val">{{ report.usdst_redeemed | money }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Outstanding Supply</span>
+        <span class="kv-val"
+              style="color:{{ 'var(--green)' if report.outstanding_supply == 0 else 'var(--red)' }};">
+          {{ report.outstanding_supply | money }}
+        </span>
+      </div>
+    </div>
+
+    {# Middle column: Settlement Performance #}
+    <div>
+      <div class="card-title">Settlement Performance</div>
+
+      <div class="kv">
+        <span class="kv-label">Total Obligations</span>
+        <span class="kv-val">{{ report.total_obligations }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Settled</span>
+        <span class="kv-val" style="color:var(--green);">
+          {{ report.settled_obligations }}
+          <small style="font-weight:400; color:var(--muted);">({{ report.settlement_percentage }}%)</small>
+        </span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Partially Settled</span>
+        <span class="kv-val" style="color:var(--amber);">{{ report.partially_settled }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Pending</span>
+        <span class="kv-val" style="color:var(--muted);">{{ report.pending_obligations }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Partial Frequency</span>
+        <span class="kv-val">{{ report.partial_settlement_frequency }}%</span>
+      </div>
+
+      <div class="progress-wrap" style="margin-top:14px;">
+        <div class="progress-fill
+          {% if report.settlement_percentage == 100 %}green
+          {% elif report.settlement_percentage >= 50 %}amber
+          {% else %}red{% endif %}"
+             style="width:{{ report.settlement_percentage }}%;"></div>
+      </div>
+      <div style="text-align:right; font-size:11px; color:var(--muted); margin-top:4px;">
+        {{ report.settlement_percentage }}% settled
+      </div>
+    </div>
+
+    {# Right column: Blockchain Summary #}
+    <div>
+      <div class="card-title">Blockchain Summary</div>
+
+      <div class="kv">
+        <span class="kv-label">XRPL Transactions</span>
+        <span class="kv-val">{{ report.xrpl_transactions | length }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Reconciled</span>
+        <span class="kv-val" style="color:var(--green);">{{ report.reconciled_count }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Exceptions</span>
+        <span class="kv-val"
+              style="color:{{ 'var(--red)' if report.exceptions_count > 0 else 'var(--muted)' }};">
+          {{ report.exceptions_count }}
+        </span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Authorizations Used</span>
+        <span class="kv-val">{{ report.authorizations | length }}</span>
+      </div>
+      <div class="kv">
+        <span class="kv-label">Audit Entries</span>
+        <span class="kv-val">{{ report.audit_entries }}</span>
+      </div>
+    </div>
+
+  </div>{# end .report-cols #}
+
+  {# Export buttons — clicking triggers a file download, no page navigation #}
+  <div style="display:flex; gap:12px; margin-top:20px;
+              padding-top:16px; border-top:1px solid var(--border);" class="no-print">
+    <a href="{{ url_for('audit_export_csv', cycle=cycle_filter) }}"
+       class="btn btn-gold">↓ Export Audit Trail CSV</a>
+    <a href="{{ url_for('audit_export_full_csv', cycle=cycle_filter) }}"
+       class="btn btn-gold">↓ Export Full Settlement Report CSV</a>
+  </div>
+
+</div>{# end report panel #}
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 4 — Audit Trail Table
+   All matching entries rendered into the DOM; JavaScript paginates them
+   50 at a time without a full page reload. Action names get colour-coded
+   badges. The Details column is truncated with a tooltip on hover.
+   Hidden in report-only mode (printable report view).
+   ══════════════════════════════════════════════════════════════════════════ #}
+
+{% if not report_only %}
+<div class="card">
+  <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>
+      Audit Trail{% if cycle_filter %} — {{ cycle_filter }}{% endif %}
+    </span>
+    <span style="font-size:11px; font-weight:400; color:var(--muted);">
+      {{ entries | length }} entries shown (cap 500)
+    </span>
+  </div>
+
+  {% if entries %}
+
+  {# Action → badge colour mapping used inside the loop below #}
+  {% set ab = {
+    'Clearing_Cycle_Created':         'badge-navy',
+    'USD_Backing_Confirmed':          'badge-blue',
+    'Issuance_Authorization_Created': 'badge-purple',
+    'Issuance_Authorization_Expired': 'badge-muted',
+    'USDST_Issued':                   'badge-green',
+    'Settlement_Executed_Full':       'badge-green',
+    'Settlement_Executed_Partial':    'badge-amber',
+    'Inbound_Status_Updated':         'badge-muted',
+    'USDST_Redeemed':                 'badge-blue',
+    'Reconciliation_Confirmed':       'badge-green',
+    'Reconciliation_Exception':       'badge-red',
+    'Exception_Resolved':             'badge-muted',
+    'Cycle_Auto_Closed':              'badge-navy',
+    'Cycle_Closed':                   'badge-navy',
+    'TrustLine_Setup':                'badge-blue',
+  } %}
+
+  <table class="data-table" id="audit-table">
+    <thead>
+      <tr>
+        <th style="width:155px;">Timestamp</th>
+        <th style="width:175px;">Cycle</th>
+        <th style="width:210px;">Action</th>
+        <th>Details</th>
+        <th style="width:140px;">Actor</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+      <tr class="audit-row">
+        <td style="font-size:11px; color:var(--muted); white-space:nowrap;">
+          {{ e.Timestamp[:19] if e.Timestamp else '—' }}
+        </td>
+        <td>
+          <span style="font-size:11px; font-weight:600; color:var(--navy);">
+            {{ e.ClearingCycleID or '—' }}
+          </span>
+        </td>
+        <td>
+          <span class="badge {{ ab[e.Action] if e.Action in ab else 'badge-muted' }}"
+                style="font-size:10px; white-space:nowrap;">
+            {{ (e.Action or '').replace('_', ' ') }}
+          </span>
+        </td>
+        <td class="details-cell" title="{{ e.Details or '' }}">
+          {{ e.Details or '—' }}
+        </td>
+        <td style="font-size:12px; color:var(--muted);">{{ e.Actor or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {# Pagination bar — JS shows/hides rows; hidden if ≤50 entries #}
+  <div class="pagination no-print" id="pagination-controls">
+    <button class="btn btn-ghost" id="prev-btn" style="padding:6px 14px;" disabled>
+      ← Previous
+    </button>
+    <span id="page-info" style="font-size:13px; color:var(--muted);"></span>
+    <button class="btn btn-ghost" id="next-btn" style="padding:6px 14px;">
+      Next →
+    </button>
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    No audit entries yet.{% if cycle_filter %}
+    No log entries recorded for {{ cycle_filter }}.{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 5 — Full Transaction Ledger
+   Shown only when a cycle is selected and has XRPL transactions. Each row
+   links out to the XRPL testnet explorer. The immutability note below the
+   table reinforces the audit trail's blockchain provenance.
+   ══════════════════════════════════════════════════════════════════════════ #}
+
+{% if cycle_filter and cycle_txs %}
+<div class="card">
+  <div class="card-title">Complete Transaction Record for {{ cycle_filter }}</div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>TxHash</th>
+        <th>Type</th>
+        <th style="text-align:right;">Amount (USDST)</th>
+        <th>Status</th>
+        <th>Confirmed At</th>
+        <th>Explorer</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tx in cycle_txs %}
+      <tr>
+        <td style="font-family:monospace; font-size:11px; letter-spacing:.3px;">
+          {{ tx.tx_hash[:8] }}…{{ tx.tx_hash[-6:] }}
+        </td>
+        <td><span class="badge badge-navy">{{ tx.type }}</span></td>
+        <td style="text-align:right; font-weight:600;">
+          {{ tx.amount | money if tx.amount is not none else '—' }}
+        </td>
+        <td>
+          <span class="badge
+            {% if tx.status == 'Reconciled' %}badge-green
+            {% elif tx.status == 'Exception' %}badge-red
+            {% else %}badge-muted{% endif %}">
+            {{ tx.status }}
+          </span>
+        </td>
+        <td style="font-size:12px; color:var(--muted);">
+          {{ tx.confirmed_at[:19] if tx.confirmed_at else '—' }}
+        </td>
+        <td>
+          <a href="{{ explorer_base }}{{ tx.tx_hash }}" target="_blank" rel="noopener"
+             class="btn btn-ghost" style="padding:3px 10px; font-size:11px;">
+            ↗ XRPL
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p style="margin-top:14px; font-size:12px; color:var(--muted);
+            padding:10px 14px; background:var(--off-white);
+            border-radius:var(--radius); border:1px solid var(--border);">
+    This record is immutable and publicly verifiable on the XRP Ledger testnet.
+    &nbsp;
+    <a href="https://testnet.xrpl.org" target="_blank" rel="noopener"
+       style="color:var(--blue);">testnet.xrpl.org ↗</a>
+  </p>
+</div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   JavaScript — client-side pagination for the audit trail table.
+   All rows are in the DOM; showPage() toggles display instead of fetching.
+   This keeps pagination instant and avoids extra server round-trips.
+   ══════════════════════════════════════════════════════════════════════════ #}
+
+<script>
+(function () {
+  'use strict';
+  var PER_PAGE = 50;
+  var page = 1;
+  var rows = [];
+
+  document.addEventListener('DOMContentLoaded', function () {
+    rows = Array.from(document.querySelectorAll('#audit-table tbody .audit-row'));
+    var controls = document.getElementById('pagination-controls');
+
+    // Hide pagination bar if all entries fit on one page
+    if (!rows.length || rows.length <= PER_PAGE) {
+      if (controls) controls.style.display = 'none';
+      return;
+    }
+
+    showPage(1);
+
+    document.getElementById('prev-btn').addEventListener('click', function () {
+      if (page > 1) showPage(page - 1);
+    });
+    document.getElementById('next-btn').addEventListener('click', function () {
+      if (page < totalPages()) showPage(page + 1);
+    });
+  });
+
+  function totalPages() {
+    return Math.ceil(rows.length / PER_PAGE);
+  }
+
+  function showPage(n) {
+    page = n;
+    var start = (n - 1) * PER_PAGE;
+    var end   = start + PER_PAGE;
+    rows.forEach(function (r, i) {
+      r.style.display = (i >= start && i < end) ? '' : 'none';
+    });
+    document.getElementById('page-info').textContent =
+      'Page ' + n + ' of ' + totalPages() + ' \u2014 ' + rows.length + ' entries total';
+    document.getElementById('prev-btn').disabled = (n <= 1);
+    document.getElementById('next-btn').disabled = (n >= totalPages());
+  }
+}());
+</script>
+
+{% endblock %}

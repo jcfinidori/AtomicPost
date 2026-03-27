@@ -1,0 +1,17 @@
+{
+  "issuer_treasury": {
+    "address": "YOUR_WALLET_ADDRESS_HERE",
+    "secret": "YOUR_WALLET_SECRET_HERE",
+    "label": "Issuer/Treasury"
+  },
+  "operator_a": {
+    "address": "YOUR_WALLET_ADDRESS_HERE",
+    "secret": "YOUR_WALLET_SECRET_HERE",
+    "label": "UAE Post"
+  },
+  "operator_b": {
+    "address": "YOUR_WALLET_ADDRESS_HERE",
+    "secret": "YOUR_WALLET_SECRET_HERE",
+    "label": "Kenya Post"
+  }
+}

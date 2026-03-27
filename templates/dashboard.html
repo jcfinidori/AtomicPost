@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — La Poste CI Settlement{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Cycle summary bar ───────────────────────────────────── */
+  .cycle-bar {
+    background: var(--navy-dark);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    border: 1px solid var(--navy-mid);
+  }
+
+  .cycle-bar-item {
+    flex: 1;
+    min-width: 160px;
+    padding: 0 20px;
+    border-right: 1px solid rgba(255,255,255,.12);
+  }
+
+  .cycle-bar-item:first-child { padding-left: 0; }
+  .cycle-bar-item:last-child  { border-right: none; }
+
+  .cycle-bar .stat-value { color: var(--white); }
+  .cycle-bar .stat-label { color: #8fa8c8; }
+
+  .cycle-id-display {
+    font-size: 18px;
+    font-weight: 800;
+    font-family: 'Courier New', monospace;
+    color: var(--gold-light);
+    letter-spacing: .5px;
+  }
+
+  .no-cycle-msg {
+    font-size: 13px;
+    color: #8fa8c8;
+    font-style: italic;
+  }
+
+  /* utilization section */
+  .util-section {
+    flex: 2;
+    min-width: 220px;
+    padding-left: 20px;
+  }
+
+  .util-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+
+  .util-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #8fa8c8;
+  }
+
+  .util-pct {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--white);
+  }
+
+  /* ── Stat grid (inside cycle bar overrides) ──────────────── */
+  .cycle-bar .stat-value {
+    font-size: 24px;
+  }
+
+  /* ── Settlement table section ────────────────────────────── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy-dark);
+  }
+
+  /* Direction badges */
+  .dir-payable    { background: var(--red-bg);   color: var(--red);   }
+  .dir-receivable { background: var(--green-bg); color: var(--green); }
+
+  /* Status badges */
+  .status-pending    { background: var(--amber-bg); color: var(--amber); }
+  .status-settled    { background: var(--green-bg); color: var(--green); }
+  .status-partial    { background: #fff8e1;          color: #7a5700; }
+  .status-reconciled { background: var(--blue-bg);  color: var(--blue); }
+  .status-exception  { background: var(--red-bg);   color: var(--red); }
+
+  .counterparty-cell {
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .amount-cell {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .carry-flag {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--amber);
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+
+  /* ── Recent activity ─────────────────────────────────────── */
+  .activity-list {
+    list-style: none;
+  }
+
+  .activity-item {
+    display: flex;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eef1f7;
+    align-items: flex-start;
+  }
+
+  .activity-item:last-child { border-bottom: none; }
+
+  .activity-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .activity-time {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  .activity-action {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--navy-dark);
+    line-height: 1.3;
+  }
+
+  .activity-details {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ── Quick actions ───────────────────────────────────────── */
+  .actions-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* ── Active Authorization chip in cycle bar ──────────────── */
+  .auth-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(200,160,0,.15);
+    border: 1px solid rgba(200,160,0,.4);
+    border-radius: var(--radius);
+    padding: 4px 10px;
+    margin-top: 6px;
+  }
+
+  .auth-chip-id {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--gold-light);
+    letter-spacing: .3px;
+  }
+
+  .auth-chip-max {
+    font-size: 11px;
+    color: #9ab8d8;
+  }
+
+  .btn-copy-dash {
+    background: none;
+    border: none;
+    color: #9ab8d8;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 2px;
+    line-height: 1;
+    vertical-align: middle;
+  }
+
+  .btn-copy-dash:hover { color: var(--gold-light); }
+
+  /* ── Two-column layout ───────────────────────────────────── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .cycle-bar-item { min-width: 140px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<h1 class="page-title">Dashboard</h1>
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 1: Cycle Summary Bar
+     ══════════════════════════════════════════════════════════ -->
+<div class="cycle-bar">
+
+  <!-- Cycle ID + status -->
+  <div class="cycle-bar-item">
+    <div class="stat-label">Active Clearing Cycle</div>
+    {% if active_cycle %}
+      <div class="cycle-id-display">{{ active_cycle.ClearingCycleID }}</div>
+      <div style="margin-top:6px">
+        <span class="badge badge-green">{{ active_cycle.Status }}</span>
+      </div>
+    {% else %}
+      <div class="cycle-id-display" style="color:#8fa8c8">—</div>
+      <div style="margin-top:6px">
+        <span class="badge badge-muted">No Active Cycle</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- USD Backing -->
+  <div class="cycle-bar-item">
+    <div class="stat-label">Total USD Backing</div>
+    <div class="stat-value">
+      ${{ "{:,.2f}".format(total_backing) }}
+    </div>
+  </div>
+
+  <!-- USDST Issued -->
+  <div class="cycle-bar-item">
+    <div class="stat-label">USDST Issued</div>
+    <div class="stat-value">
+      {{ "{:,.2f}".format(total_issued) }}
+    </div>
+  </div>
+
+  <!-- Available Capacity -->
+  <div class="cycle-bar-item">
+    <div class="stat-label">Available Capacity</div>
+    <div class="stat-value">
+      {{ "{:,.2f}".format(available_capacity) }}
+    </div>
+  </div>
+
+  <!-- Active Authorization -->
+  <div class="cycle-bar-item">
+    <div class="stat-label">Active Authorization</div>
+    {% if active_auth %}
+      <div class="auth-chip">
+        <span class="auth-chip-id">{{ active_auth.IssuanceAuthorizationID }}</span>
+        <button class="btn-copy-dash" title="Copy Authorization ID"
+                onclick="copyDashAuthID('{{ active_auth.IssuanceAuthorizationID }}', this)">
+          &#128203;
+        </button>
+      </div>
+      <div class="auth-chip-max" style="margin-top:4px; font-size:11px; color:#9ab8d8">
+        Max: <strong style="color:var(--gold-light)">${{ "{:,.2f}".format(active_auth.MaximumIssuableAmount) }}</strong>
+      </div>
+    {% else %}
+      <div style="margin-top:6px">
+        <span class="badge badge-muted" style="font-size:10px">None</span>
+      </div>
+      <div style="margin-top:4px; font-size:11px; color:#8fa8c8; font-style:italic">
+        No active authorization
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Utilization bar -->
+  <div class="cycle-bar-item util-section">
+    <div class="util-header">
+      <span class="util-label">Utilization</span>
+      <span class="util-pct">{{ utilization_pct }}%</span>
+    </div>
+    <div class="progress-wrap">
+      {% if utilization_pct < 70 %}
+        {% set bar_class = "green" %}
+      {% elif utilization_pct < 90 %}
+        {% set bar_class = "amber" %}
+      {% else %}
+        {% set bar_class = "red" %}
+      {% endif %}
+      <div class="progress-fill {{ bar_class }}"
+           style="width: {{ [utilization_pct, 100]|min }}%">
+      </div>
+    </div>
+    <div style="margin-top:6px; font-size:11px; color:#8fa8c8;">
+      {% if utilization_pct < 70 %}
+        Within safe limits
+      {% elif utilization_pct < 90 %}
+        Approaching capacity — review reserves
+      {% else %}
+        Critical — increase USD backing
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 2: Settlement Obligations Table
+     ══════════════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="section-header">
+    <span class="section-title">Settlement Obligations</span>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      {% for status, cnt in status_counts.items() %}
+        <span class="badge badge-navy">{{ status }}: {{ cnt }}</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if settlement_records %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Record ID</th>
+          <th>Cycle</th>
+          <th>Counterparty</th>
+          <th style="text-align:right">Amount</th>
+          <th>Currency</th>
+          <th>Direction</th>
+          <th>Status</th>
+          <th>Carry&nbsp;Fwd</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rec in settlement_records %}
+        <tr>
+          <td style="font-family:monospace; font-size:12px">
+            {{ rec.SettlementRecordID }}
+          </td>
+          <td style="font-family:monospace; font-size:12px">
+            {{ rec.ClearingCycleID or '—' }}
+          </td>
+          <td class="counterparty-cell">
+            {% if rec.CounterpartyID == 'UAE_POST' %}
+              UAE Post
+            {% elif rec.CounterpartyID == 'KENYA_POST' %}
+              Kenya Post
+            {% else %}
+              {{ rec.CounterpartyID }}
+            {% endif %}
+          </td>
+          <td class="amount-cell">
+            {{ "{:,.2f}".format(rec.Amount) }}
+          </td>
+          <td>
+            <span class="badge badge-navy">{{ rec.Currency }}</span>
+          </td>
+          <td>
+            {% if rec.Direction == 'Payable' %}
+              <span class="badge dir-payable">Payable</span>
+            {% else %}
+              <span class="badge dir-receivable">Receivable</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if rec.Status == 'Pending_Settlement' %}
+              <span class="badge status-pending">Pending</span>
+            {% elif rec.Status == 'Settled' %}
+              <span class="badge status-settled">Settled</span>
+            {% elif rec.Status == 'Partially_Settled' %}
+              <span class="badge status-partial">Partial</span>
+            {% elif rec.Status == 'Reconciled' %}
+              <span class="badge status-reconciled">Reconciled</span>
+            {% elif rec.Status == 'Exception' %}
+              <span class="badge status-exception">Exception</span>
+            {% else %}
+              <span class="badge badge-muted">{{ rec.Status }}</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center">
+            {% if rec.PartialCarryForwardFlag == 'Y' %}
+              <span class="badge badge-amber" style="background:var(--amber-bg);color:var(--amber)">Y</span>
+            {% else %}
+              <span style="color:var(--muted)">—</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px; color:var(--muted)">
+            {{ rec.UpdatedAt[:16] if rec.UpdatedAt else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty-state">
+      No settlement records yet.<br>
+      <span style="font-size:12px">Create a clearing cycle and add obligations to get started.</span>
+    </div>
+  {% endif %}
+</div>
+
+
+{% include 'comparison_panel.html' %}
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTIONS 3 + 4: Recent Activity & Quick Actions (2-col)
+     ══════════════════════════════════════════════════════════ -->
+<div class="two-col">
+
+  <!-- Section 3: Recent Activity -->
+  <div class="card">
+    <div class="card-title">Recent Activity</div>
+    {% if audit_entries %}
+      <ul class="activity-list">
+        {% for entry in audit_entries %}
+        <li class="activity-item">
+          <div class="activity-dot"></div>
+          <div>
+            <div class="activity-time">
+              {{ entry.Timestamp[:19].replace('T', ' ') if entry.Timestamp else '—' }}
+            </div>
+            <div class="activity-action">{{ entry.Action }}</div>
+            {% if entry.Details %}
+              <div class="activity-details">{{ entry.Details }}</div>
+            {% endif %}
+            {% if entry.ClearingCycleID %}
+              <div style="margin-top:2px">
+                <span class="badge badge-navy" style="font-size:10px">
+                  {{ entry.ClearingCycleID }}
+                </span>
+              </div>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      <div style="margin-top:12px; text-align:right">
+        <a href="{{ url_for('audit_log_view') }}" class="btn btn-ghost" style="font-size:12px; padding:5px 12px">
+          View Full Log &rarr;
+        </a>
+      </div>
+    {% else %}
+      <div class="empty-state">No activity recorded yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Section 4: Quick Actions -->
+  <div class="card">
+    <div class="card-title">Quick Actions</div>
+    <p style="color:var(--muted); font-size:13px; margin-bottom:18px; line-height:1.5">
+      Use the actions below to manage the settlement lifecycle for the current clearing period.
+    </p>
+    <div class="actions-grid">
+      <a href="{{ url_for('clearing') }}" class="btn btn-gold" style="width:100%">
+        &#43; New Clearing Cycle
+      </a>
+      <a href="{{ url_for('reserve_governance') }}" class="btn btn-navy" style="width:100%">
+        &#9646; Manage Reserves
+      </a>
+      <a href="{{ url_for('settlement') }}" class="btn btn-navy" style="width:100%">
+        &#8646; Execute Settlement
+      </a>
+    </div>
+
+    <!-- Wallet reference panel -->
+    {% if wallets %}
+    <div style="margin-top:22px; padding-top:16px; border-top:1px solid var(--border)">
+      <div class="card-title" style="margin-bottom:10px">Wallet Reference</div>
+      <table style="width:100%; font-size:12px; border-collapse:collapse">
+        <tr>
+          <td style="color:var(--muted); padding:3px 0; width:110px">La Poste CI</td>
+          <td style="font-family:monospace; color:var(--navy); font-size:11px">
+            {{ wallets.issuer_treasury }}
+          </td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted); padding:3px 0">UAE Post</td>
+          <td style="font-family:monospace; color:var(--navy); font-size:11px">
+            {{ wallets.operator_a }}
+          </td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted); padding:3px 0">Kenya Post</td>
+          <td style="font-family:monospace; color:var(--navy); font-size:11px">
+            {{ wallets.operator_b }}
+          </td>
+        </tr>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  function copyDashAuthID(id, btn) {
+    navigator.clipboard.writeText(id).then(() => {
+      btn.textContent = '\u2713';
+      setTimeout(() => { btn.innerHTML = '&#128203;'; }, 2000);
+    });
+  }
+</script>
+{% endblock %}

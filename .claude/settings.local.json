@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/bin/python accounts.py)",
+      "Bash(venv/bin/python 01_setup_trustlines.py)",
+      "Bash(venv/bin/python 02_issue_usdst.py)",
+      "Bash(venv/bin/python -c \"from xrpl.models.transactions import Payment; import inspect; print\\(inspect.getfile\\(Payment\\)\\)\")",
+      "Bash(venv/bin/python -c \"from xrpl.models import Memo, MemoWrapper; print\\('OK'\\)\")",
+      "Bash(venv/bin/python -c \"from xrpl.models import Memo; print\\('OK'\\)\" && venv/bin/python -c \"import xrpl.models.transactions as t; print\\(dir\\(t\\)\\)\")",
+      "Bash(venv/bin/python -c \"from xrpl.models.transactions import Memo; help\\(Memo\\)\")",
+      "Bash(venv/bin/python 03_settlement_payment.py)",
+      "Bash(venv/bin/python - <<'EOF'\nfrom xrpl.clients import WebsocketClient\nfrom xrpl.models.requests import AccountLines, AccountInfo\nfrom accounts import load_accounts\n\nTESTNET_URL = \"wss://s.altnet.rippletest.net:51233\"\naccounts = load_accounts\\(\\)\n\nwith WebsocketClient\\(TESTNET_URL\\) as client:\n    for key, entry in accounts.items\\(\\):\n        addr = entry[\"address\"]\n        label = entry[\"label\"]\n        resp = client.request\\(AccountLines\\(account=addr\\)\\)\n        lines = resp.result.get\\(\"lines\", []\\)\n        print\\(f\"\\\\n{label} \\({addr}\\)\"\\)\n        if not lines:\n            print\\(\"  No trust lines\"\\)\n        for line in lines:\n            print\\(f\"  currency={line['currency']}  balance={line['balance']}  limit={line['limit']}  account={line['account']}\"\\)\nEOF)",
+      "Bash(venv/bin/python - <<'EOF'\nfrom xrpl.models.path import Path, PathStep; help\\(Path\\)\nEOF)",
+      "Bash(venv/bin/python 04_partial_settlement.py)",
+      "Bash(ls:*)",
+      "Bash(/Users/macbook/Desktop/apostal_poc/venv/bin/pip install:*)",
+      "Bash(venv/bin/python -c \"\nfrom app import app\nclient = app.test_client\\(\\)\nr = client.get\\('/'\\)\nprint\\('GET / →', r.status_code\\)\nr2 = client.get\\('/clearing-setup'\\)\nprint\\('GET /clearing-setup →', r2.status_code\\)\nr3 = client.get\\('/audit-log'\\)\nprint\\('GET /audit-log →', r3.status_code\\)\n\" 2>&1)",
+      "Bash(venv/bin/python -c \"\nfrom app import app\nwith app.test_request_context\\('/'\\):\n    from flask import url_for\n    checks = [\n        \\('issuance',                  url_for\\('issuance'\\)\\),\n        \\('issuance_setup_trustline',  url_for\\('issuance_setup_trustline'\\)\\),\n        \\('issuance_issue',            url_for\\('issuance_issue'\\)\\),\n        \\('issuance_redeem',           url_for\\('issuance_redeem'\\)\\),\n        \\('reserve_governance',        url_for\\('reserve_governance'\\)\\),\n        \\('clearing',                  url_for\\('clearing'\\)\\),\n        \\('dashboard',                 url_for\\('dashboard'\\)\\),\n    ]\n    for name, path in checks:\n        print\\(f'  {name:<32s} -> {path}'\\)\nprint\\('All url_for calls resolved correctly.'\\)\n\" 2>&1)",
+      "Bash(sqlite3:*)",
+      "Bash(python3:*)"
+    ]
+  }
+}

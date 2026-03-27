@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}La Poste CI — Postal Settlement{% endblock %}</title>
+  <style>
+    /* ── Reset & base ────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:       #0d2b55;
+      --navy-dark:  #071a36;
+      --navy-mid:   #1a3f72;
+      --gold:       #c9a227;
+      --gold-light: #f0c84a;
+      --white:      #ffffff;
+      --off-white:  #f4f6fb;
+      --border:     #d0d8e8;
+      --text:       #1a2540;
+      --muted:      #6b7a99;
+
+      --green:  #1a7a4a;
+      --green-bg: #e6f5ed;
+      --amber:  #b35c00;
+      --amber-bg: #fff3e0;
+      --red:    #c0392b;
+      --red-bg: #fdecea;
+      --blue:   #1558a8;
+      --blue-bg:#e8f0fb;
+
+      --radius: 6px;
+      --shadow: 0 2px 8px rgba(13,43,85,.12);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--off-white);
+    }
+
+    a { color: var(--gold); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Top header ──────────────────────────────────────────── */
+    .site-header {
+      background: var(--navy-dark);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      border-bottom: 3px solid var(--gold);
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: var(--gold);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 15px;
+      color: var(--navy-dark);
+      flex-shrink: 0;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .brand-name {
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: .3px;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: #9db3cc;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .xrpl-badge {
+      background: #193f7a;
+      border: 1px solid #2d5fa8;
+      color: #89b4f7;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+    }
+
+    .header-actor {
+      font-size: 12px;
+      color: #9db3cc;
+    }
+
+    /* ── Navigation ──────────────────────────────────────────── */
+    .site-nav {
+      background: var(--navy);
+      display: flex;
+      align-items: stretch;
+      padding: 0 24px;
+      gap: 2px;
+      border-bottom: 1px solid var(--navy-mid);
+    }
+
+    .site-nav a {
+      color: #b8ccdf;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 0 14px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      border-bottom: 3px solid transparent;
+      transition: color .15s, border-color .15s, background .15s;
+      white-space: nowrap;
+    }
+
+    .site-nav a:hover {
+      color: var(--white);
+      background: rgba(255,255,255,.06);
+      text-decoration: none;
+    }
+
+    .site-nav a.active {
+      color: var(--gold-light);
+      border-bottom-color: var(--gold);
+      background: rgba(201,162,39,.08);
+    }
+
+    /* ── Layout wrapper ──────────────────────────────────────── */
+    .page-body {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+    }
+
+    .page-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--navy-dark);
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Notifications ───────────────────────────────────────── */
+    .flash-area {
+      margin-bottom: 16px;
+    }
+
+    .flash {
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      border-left: 4px solid;
+    }
+
+    .flash.success {
+      background: var(--green-bg);
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    .flash.error {
+      background: var(--red-bg);
+      color: var(--red);
+      border-color: var(--red);
+    }
+
+    .flash.info {
+      background: var(--blue-bg);
+      color: var(--blue);
+      border-color: var(--blue);
+    }
+
+    /* ── Cards ───────────────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── Tables ──────────────────────────────────────────────── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--off-white);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eef1f7;
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: #f8fafd; }
+
+    .empty-state {
+      text-align: center;
+      padding: 32px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* ── Badges ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+    }
+
+    .badge-green   { background: var(--green-bg);  color: var(--green); }
+    .badge-red     { background: var(--red-bg);    color: var(--red); }
+    .badge-amber   { background: var(--amber-bg);  color: var(--amber); }
+    .badge-blue    { background: var(--blue-bg);   color: var(--blue); }
+    .badge-navy    { background: #e6eaf5;           color: var(--navy); }
+    .badge-muted   { background: #eef1f7;           color: var(--muted); }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: opacity .15s, box-shadow .15s;
+    }
+
+    .btn:hover { opacity: .88; text-decoration: none; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+
+    .btn-gold  { background: var(--gold); color: var(--navy-dark); }
+    .btn-navy  { background: var(--navy); color: var(--white); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--navy);
+      border: 1px solid var(--border);
+    }
+
+    /* ── Stat numbers ────────────────────────────────────────── */
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.1;
+      color: var(--navy-dark);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* ── Progress bar ────────────────────────────────────────── */
+    .progress-wrap {
+      background: #e8edf5;
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width .4s ease;
+    }
+
+    .progress-fill.green  { background: #27ae60; }
+    .progress-fill.amber  { background: #e67e22; }
+    .progress-fill.red    { background: var(--red); }
+
+    /* ── Input + inline button pair ─────────────────────────── */
+    .input-with-btn {
+      display: flex;
+      gap: 6px;
+    }
+
+    .input-with-btn input {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 7px 10px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .input-with-btn input:focus {
+      outline: none;
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(13,43,85,.1);
+    }
+
+    .gen-btn {
+      background: var(--navy);
+      border: 1px solid var(--navy-mid);
+      border-radius: var(--radius);
+      padding: 7px 11px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--white);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .gen-btn:hover { opacity: .85; }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .site-footer {
+      text-align: center;
+      padding: 16px;
+      font-size: 11px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-brand">
+      <div class="brand-logo">LP</div>
+      <div class="brand-text">
+        <span class="brand-name">La Poste CI</span>
+        <span class="brand-sub">Postal Settlement System</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="xrpl-badge">XRPL Testnet</span>
+      <span class="header-actor">Treasury Manager</span>
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="site-nav">
+    <a href="{{ url_for('dashboard') }}"
+       class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">
+      Dashboard
+    </a>
+    <a href="{{ url_for('clearing') }}"
+       class="{{ 'active' if request.endpoint in ('clearing','clearing_create','clearing_close') else '' }}">
+      Clearing Setup
+    </a>
+    <a href="{{ url_for('reserve_governance') }}"
+       class="{{ 'active' if request.endpoint in ('reserve_governance','reserve_set_backing','reserve_create_authorization','reserve_expire_authorization') else '' }}">
+      Reserve Governance
+    </a>
+    <a href="{{ url_for('issuance') }}"
+       class="{{ 'active' if request.endpoint in ('issuance','issuance_setup_trustline','issuance_issue','issuance_redeem') else '' }}">
+      Issuance
+    </a>
+    <a href="{{ url_for('settlement') }}"
+       class="{{ 'active' if request.endpoint in ('settlement','settlement_execute','settlement_update_inbound','settlement_simulate_inbound') else '' }}">
+      Settlement
+    </a>
+    <a href="{{ url_for('reconciliation') }}"
+       class="{{ 'active' if request.endpoint in ('reconciliation','reconciliation_reconcile','reconciliation_resolve_exception','reconciliation_reconcile_all') else '' }}">
+      Reconciliation
+    </a>
+    <a href="{{ url_for('audit_log_view') }}"
+       class="{{ 'active' if request.endpoint in ('audit_log_view','audit_report','audit_export_csv','audit_export_full_csv') else '' }}">
+      Audit Log
+    </a>
+  </nav>
+
+  <!-- Flash messages -->
+  <div class="page-body">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-area">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+
+  <footer class="site-footer">
+    La Poste CI &mdash; Postal Stablecoin Settlement POC &mdash; XRPL Testnet &mdash;
+    Home Operator: La Poste CI &nbsp;|&nbsp; Counterparties: UAE Post &amp; Kenya Post
+  </footer>
+
+<script>
+  /* Shared ID generators — available on every page */
+  function generateTreasuryApprovalID() {
+    var digits = Math.floor(10000 + Math.random() * 90000);
+    return 'TA_' + digits;
+  }
+
+  function genTa(inputId) {
+    var el = document.getElementById(inputId);
+    if (el) el.value = generateTreasuryApprovalID();
+  }
+
+  function genId(inputId, prefix) {
+    var el = document.getElementById(inputId);
+    if (el) el.value = prefix + Math.floor(10000 + Math.random() * 90000);
+  }
+</script>
+</body>
+</html>

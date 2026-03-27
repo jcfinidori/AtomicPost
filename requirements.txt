@@ -1,0 +1,10 @@
+# XRPL
+xrpl-py>=2.0.0
+
+# Web framework
+Flask>=2.0.0
+
+# Solana / Anchor (future phases)
+solana
+solders
+anchorpy

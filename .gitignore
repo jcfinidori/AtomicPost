@@ -1,0 +1,22 @@
+# Wallet credentials — NEVER commit these
+accounts.json
+
+# Local database
+postal.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+.env.*
+
+# macOS
+.DS_Store

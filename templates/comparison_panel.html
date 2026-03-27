@@ -1,0 +1,529 @@
+{#
+  comparison_panel.html — reusable partial
+  Include with: {% include 'comparison_panel.html' %}
+
+  Expects in parent context:
+    comparison_metrics  — dict from calculate_cycle_metrics(), or None
+    recent_settlements  — list from _recent_settlements(), may be empty
+
+  Shows static estimates gracefully when no metrics data exists yet.
+#}
+
+{# ── Convenience aliases (safe even when comparison_metrics is None) ── #}
+{% set m = comparison_metrics %}
+{% set has_data = m and m.total_transactions > 0 %}
+
+{# Pre-compute the savings figure used in the gold bar #}
+{% if has_data %}
+  {% set fee_saving = m.traditional_estimated_fees - m.total_fees_usdst %}
+{% elif m %}
+  {% set fee_saving = m.traditional_estimated_fees %}
+{% else %}
+  {% set fee_saving = None %}
+{% endif %}
+
+<style>
+  /* ── Comparison panel layout ─────────────────────────────────────────── */
+  .cp-wrap {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .cp-header {
+    padding: 14px 20px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .cp-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--navy-dark);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .cp-subtitle {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Two-column comparison grid ─────────────────────────────────────── */
+  .cp-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (max-width: 700px) { .cp-cols { grid-template-columns: 1fr; } }
+
+  /* ── Left column: traditional banking ───────────────────────────────── */
+  .cp-trad {
+    background: #f5f5f5;
+    padding: 18px 22px;
+    border-right: 1px solid #ddd;
+  }
+
+  .cp-col-header {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    margin-bottom: 14px;
+  }
+
+  .cp-trad .cp-col-header { color: #888; }
+
+  .cp-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(0,0,0,.07);
+    gap: 10px;
+  }
+
+  .cp-row:last-child { border-bottom: none; }
+
+  .cp-row-label {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.4;
+    min-width: 0;
+  }
+
+  .cp-row-label small {
+    display: block;
+    font-size: 10px;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  .cp-row-val {
+    font-size: 13px;
+    font-weight: 700;
+    color: #555;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .cp-row-val small {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  /* ── Right column: XRPL ─────────────────────────────────────────────── */
+  .cp-xrpl {
+    background: #1a237e;
+    padding: 18px 22px;
+    position: relative;
+  }
+
+  .cp-xrpl .cp-col-header { color: #ffd700; }
+
+  .cp-xrpl .cp-row {
+    border-bottom-color: rgba(255,255,255,.1);
+  }
+
+  .cp-xrpl .cp-row-label { color: rgba(255,255,255,.65); }
+  .cp-xrpl .cp-row-label small { color: rgba(255,255,255,.4); }
+  .cp-xrpl .cp-row-val   { color: #fff; }
+
+  /* Live data values get gold colour + slightly larger font */
+  .cp-live-val {
+    color: #ffd700 !important;
+    font-size: 15px !important;
+  }
+
+  .cp-green-val { color: #4caf50 !important; }
+
+  /* ── LIVE badge ──────────────────────────────────────────────────────── */
+  .cp-live-badge {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    background: #ffd700;
+    color: #1a237e;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    animation: livePulse 2s ease-in-out infinite;
+  }
+
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .55; }
+  }
+
+  /* ── Savings summary bar ─────────────────────────────────────────────── */
+  .cp-savings {
+    background: #ffd700;
+    padding: 14px 22px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    border-top: 1px solid rgba(0,0,0,.08);
+  }
+
+  @media (max-width: 600px) { .cp-savings { grid-template-columns: 1fr; } }
+
+  .cp-saving-item { text-align: center; }
+
+  .cp-saving-val {
+    font-size: 18px;
+    font-weight: 800;
+    color: #1a237e;
+    line-height: 1.2;
+  }
+
+  .cp-saving-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #2c3a8c;
+    margin-bottom: 2px;
+  }
+
+  .cp-saving-sub {
+    font-size: 10px;
+    color: rgba(26,35,126,.7);
+    margin-top: 2px;
+  }
+
+  /* ── Live ticker ─────────────────────────────────────────────────────── */
+  .cp-ticker {
+    padding: 10px 20px;
+    background: #0d1b5e;
+    border-top: 1px solid rgba(255,255,255,.08);
+    min-height: 36px;
+  }
+
+  .cp-ticker-inner {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .cp-ticker-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: #ffd700;
+    white-space: nowrap;
+  }
+
+  #cp-ticker-entries {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  .cp-tick-entry {
+    font-size: 11px;
+    color: rgba(255,255,255,.75);
+    white-space: nowrap;
+  }
+
+  .cp-tick-entry .tick-check { color: #4caf50; }
+  .cp-tick-entry .tick-hash  { color: rgba(255,255,255,.35); font-family: monospace; }
+
+  .cp-ticker-empty {
+    font-size: 11px;
+    color: rgba(255,255,255,.35);
+    font-style: italic;
+  }
+</style>
+
+<div class="cp-wrap">
+
+  {# ── Panel header ──────────────────────────────────────────────────────── #}
+  <div class="cp-header">
+    <span class="cp-title">Settlement Method Comparison</span>
+    <span class="cp-subtitle">
+      {% if m %}Live data from {{ m.cycle_id }}{% else %}Static estimates{% endif %}
+    </span>
+  </div>
+
+  {# ── Two-column grid ───────────────────────────────────────────────────── #}
+  <div class="cp-cols">
+
+    {# LEFT — Traditional correspondent banking (always static) #}
+    <div class="cp-trad">
+      <div class="cp-col-header">Correspondent Banking</div>
+
+      <div class="cp-row">
+        <div class="cp-row-label">
+          Time to Finality
+          <small>Settlement window</small>
+        </div>
+        <div class="cp-row-val">
+          7 — 30 days
+          <small>(avg. 21 days)</small>
+        </div>
+      </div>
+
+      <div class="cp-row">
+        <div class="cp-row-label">Intermediaries Required</div>
+        <div class="cp-row-val">2 — 3 banks</div>
+      </div>
+
+      <div class="cp-row">
+        <div class="cp-row-label">
+          Estimated Cost
+          <small>(0.5% FX spread + $75/wire)</small>
+        </div>
+        <div class="cp-row-val">
+          {% if m %}
+            ${{ m.traditional_estimated_fees | money }}
+          {% else %}
+            Est. $0.00
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="cp-row">
+        <div class="cp-row-label">FX Exposure Duration</div>
+        <div class="cp-row-val">3 — 5 days</div>
+      </div>
+
+      <div class="cp-row">
+        <div class="cp-row-label">
+          Settlement Visibility
+          <small>Manual reconciliation required</small>
+        </div>
+        <div class="cp-row-val">Limited</div>
+      </div>
+
+      <div class="cp-row">
+        <div class="cp-row-label">Operating Hours</div>
+        <div class="cp-row-val">Business days only</div>
+      </div>
+    </div>
+
+    {# RIGHT — XRPL stablecoin (live data when available) #}
+    <div class="cp-xrpl">
+      <span class="cp-live-badge">LIVE</span>
+      <div class="cp-col-header">XRPL USD-ST</div>
+
+      {# Row 1: Time to finality — shows real avg when data exists #}
+      <div class="cp-row">
+        <div class="cp-row-label" style="color:rgba(255,255,255,.65);">
+          Time to Finality
+          {% if has_data %}<small style="color:rgba(255,255,255,.4);">(actual recorded time)</small>{% endif %}
+        </div>
+        <div class="cp-row-val {% if has_data %}cp-live-val{% endif %}"
+             id="cp-avg-time">
+          {% if has_data %}
+            {{ m.avg_execution_seconds }}s
+          {% else %}
+            3 — 5 seconds
+          {% endif %}
+        </div>
+      </div>
+
+      {# Row 2: Intermediaries #}
+      <div class="cp-row">
+        <div class="cp-row-label" style="color:rgba(255,255,255,.65);">Intermediaries Required</div>
+        <div class="cp-row-val cp-live-val">0</div>
+      </div>
+
+      {# Row 3: Network fee — updates with real data #}
+      <div class="cp-row">
+        <div class="cp-row-label" style="color:rgba(255,255,255,.65);">
+          Actual Network Cost
+          <small style="color:rgba(255,255,255,.4);">(XRPL network fee only)</small>
+        </div>
+        <div class="cp-row-val {% if has_data %}cp-live-val{% endif %}"
+             id="cp-fees">
+          {% if has_data %}
+            ${{ "%.6f" % m.total_fees_usdst }}
+          {% else %}
+            ~$0.000012/tx
+          {% endif %}
+        </div>
+      </div>
+
+      {# Row 4: FX exposure #}
+      <div class="cp-row">
+        <div class="cp-row-label" style="color:rgba(255,255,255,.65);">FX Exposure Duration</div>
+        <div class="cp-row-val cp-live-val">Seconds</div>
+      </div>
+
+      {# Row 5: Visibility #}
+      <div class="cp-row">
+        <div class="cp-row-label" style="color:rgba(255,255,255,.65);">
+          Settlement Visibility
+          <small style="color:rgba(255,255,255,.4);">Immutable on-chain audit trail</small>
+        </div>
+        <div class="cp-row-val cp-green-val">Complete</div>
+      </div>
+
+      {# Row 6: Availability #}
+      <div class="cp-row">
+        <div class="cp-row-label" style="color:rgba(255,255,255,.65);">Operating Hours</div>
+        <div class="cp-row-val cp-green-val">24/7 — 365 days</div>
+      </div>
+    </div>
+
+  </div>{# end .cp-cols #}
+
+  {# ── Savings summary bar ─────────────────────────────────────────────────── #}
+  <div class="cp-savings">
+
+    <div class="cp-saving-item">
+      <div class="cp-saving-label">Settlement Accelerated By</div>
+      <div class="cp-saving-val">99.99%</div>
+      <div class="cp-saving-sub">From 21 days to seconds</div>
+    </div>
+
+    <div class="cp-saving-item">
+      <div class="cp-saving-label">Estimated Fee Saving</div>
+      <div class="cp-saving-val" id="cp-fee-saving">
+        {% if has_data and fee_saving is not none %}
+          Save ${{ fee_saving | money }}
+        {% elif m and m.traditional_estimated_fees > 0 %}
+          Up to ${{ m.traditional_estimated_fees | money }}
+        {% else %}
+          Up to $0.00 est.
+        {% endif %}
+      </div>
+      <div class="cp-saving-sub">Per clearing cycle</div>
+    </div>
+
+    <div class="cp-saving-item">
+      <div class="cp-saving-label">Obligations Settled On-Chain</div>
+      <div class="cp-saving-val" id="cp-tx-count">
+        {% if m %}{{ m.total_transactions }}{% else %}0{% endif %}
+      </div>
+      <div class="cp-saving-sub" id="cp-total-settled">
+        {% if m and m.total_settled > 0 %}
+          ${{ m.total_settled | money }} USDST
+        {% else %}
+          Awaiting settlements
+        {% endif %}
+      </div>
+    </div>
+
+  </div>{# end .cp-savings #}
+
+  {# ── Live transaction ticker ─────────────────────────────────────────────── #}
+  <div class="cp-ticker">
+    <div class="cp-ticker-inner">
+      <span class="cp-ticker-label">Recent</span>
+      <div id="cp-ticker-entries">
+        {% if recent_settlements %}
+          {% for s in recent_settlements %}
+          <span class="cp-tick-entry">
+            <span class="tick-check">✅</span>
+            {{ s.time_ago }} —
+            {{ s.AmountUSDST | money }} USDST settled in
+            {{ s.ExecutionTimeSeconds }}s
+            <span class="tick-hash">{{ s.tx_hash_short }}…</span>
+          </span>
+          {% endfor %}
+        {% else %}
+          <span class="cp-ticker-empty">Awaiting first settlement transaction…</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>{# end .cp-wrap #}
+
+{# ── JavaScript: refresh ticker and live metrics every 30 seconds ──────────── #}
+<script>
+(function () {
+  'use strict';
+
+  function fmtMoney(n) {
+    if (n == null) return '—';
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function renderTicker(settlements) {
+    var el = document.getElementById('cp-ticker-entries');
+    if (!el) return;
+    if (!settlements || !settlements.length) {
+      el.innerHTML = '<span class="cp-ticker-empty">Awaiting first settlement transaction…</span>';
+      return;
+    }
+    el.innerHTML = settlements.map(function (s) {
+      return '<span class="cp-tick-entry">'
+        + '<span class="tick-check">✅</span> '
+        + (s.time_ago || '') + ' — '
+        + fmtMoney(s.amount) + ' USDST settled in '
+        + (s.execution_seconds != null ? s.execution_seconds + 's' : '—s')
+        + ' <span class="tick-hash">' + (s.tx_hash || '') + '…</span>'
+        + '</span>';
+    }).join('');
+  }
+
+  function refreshPanel() {
+    fetch('/api/recent-settlements')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        renderTicker(data.settlements);
+
+        var m = data.comparison_metrics;
+        if (!m) return;
+
+        var hasData = m.total_transactions > 0;
+
+        // Update avg execution time
+        var avgEl = document.getElementById('cp-avg-time');
+        if (avgEl && hasData && m.avg_execution_seconds != null) {
+          avgEl.textContent = m.avg_execution_seconds + 's';
+          avgEl.classList.add('cp-live-val');
+        }
+
+        // Update fee display
+        var feeEl = document.getElementById('cp-fees');
+        if (feeEl && hasData) {
+          feeEl.textContent = '$' + (m.total_fees_usdst || 0).toFixed(6);
+          feeEl.classList.add('cp-live-val');
+        }
+
+        // Update savings bar
+        var savingEl = document.getElementById('cp-fee-saving');
+        if (savingEl) {
+          var saving = (m.traditional_estimated_fees || 0) - (m.total_fees_usdst || 0);
+          if (hasData) {
+            savingEl.textContent = 'Save $' + fmtMoney(saving);
+          } else if (m.traditional_estimated_fees > 0) {
+            savingEl.textContent = 'Up to $' + fmtMoney(m.traditional_estimated_fees);
+          }
+        }
+
+        // Update transaction count + total settled
+        var txEl = document.getElementById('cp-tx-count');
+        if (txEl) txEl.textContent = m.total_transactions;
+
+        var totalEl = document.getElementById('cp-total-settled');
+        if (totalEl) {
+          totalEl.textContent = m.total_settled > 0
+            ? '$' + fmtMoney(m.total_settled) + ' USDST'
+            : 'Awaiting settlements';
+        }
+      })
+      .catch(function () { /* silently ignore network errors */ });
+  }
+
+  // Refresh immediately on load, then every 30 s
+  document.addEventListener('DOMContentLoaded', refreshPanel);
+  setInterval(refreshPanel, 30000);
+}());
+</script>
