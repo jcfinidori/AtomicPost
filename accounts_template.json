@@ -13,5 +13,20 @@
     "address": "YOUR_WALLET_ADDRESS_HERE",
     "secret": "YOUR_WALLET_SECRET_HERE",
     "label": "Kenya Post"
+  },
+  "solana_mint_address": "YOUR_SPL_MINT_ADDRESS_HERE",
+  "solana": {
+    "treasury": {
+      "public_key": "YOUR_SOLANA_PUBLIC_KEY_HERE",
+      "private_key": "YOUR_SOLANA_PRIVATE_KEY_HERE"
+    },
+    "operator_a": {
+      "public_key": "YOUR_SOLANA_PUBLIC_KEY_HERE",
+      "private_key": "YOUR_SOLANA_PRIVATE_KEY_HERE"
+    },
+    "operator_b": {
+      "public_key": "YOUR_SOLANA_PUBLIC_KEY_HERE",
+      "private_key": "YOUR_SOLANA_PRIVATE_KEY_HERE"
+    }
   }
 }
