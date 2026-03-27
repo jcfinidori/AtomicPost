@@ -71,15 +71,15 @@ These are real transactions executed during development. Publicly verifiable now
 
 | Step | Action                                           | Explorer |
 |------|--------------------------------------------------|----------|
-| 1    | USD-ST Issuance — Treasury mints stablecoin      | [View on Solana](https://explorer.solana.com/tx/Wu1xKfofwNvBjcL5C66ZTXjXxcadW4amfXHGbv7zYH7TDJtuuxngUeBh8Jvar2doFB53JKxoKdfUsr7V6vM57Du?cluster=devnet) |
-| 2    | Cross-Border Settlement — Operator payment       | [View on Solana](https://explorer.solana.com/tx/4k7VTSatS7iUyzh7TtwteGT61QarfsXxUPZYvJUc1GhCUYk59JFgrGMmf7NCKfn2TDBSHyUQwaZbnf4QAdmu3pSn?cluster=devnet) |
-| 3    | Token Redemption — Burn and release USD          | [View on Solana](https://explorer.solana.com/tx/JHj4HSQZeGrq3dJakbcXmu6qZWF5k3cwcvCz9AE9RQ3MUJfJSqRFo2qUGMWBcmj2rMEjLr1hxTyHkGcNWLEDZnD?cluster=devnet) |
+| 1    | USD-ST Issuance: treasury mints stablecoin      | [View on Solana](https://explorer.solana.com/tx/Wu1xKfofwNvBjcL5C66ZTXjXxcadW4amfXHGbv7zYH7TDJtuuxngUeBh8Jvar2doFB53JKxoKdfUsr7V6vM57Du?cluster=devnet) |
+| 2    | Cross-Border Settlement: operator payment       | [View on Solana](https://explorer.solana.com/tx/4k7VTSatS7iUyzh7TtwteGT61QarfsXxUPZYvJUc1GhCUYk59JFgrGMmf7NCKfn2TDBSHyUQwaZbnf4QAdmu3pSn?cluster=devnet) |
+| 3    | Token Redemption: burn and release USD          | [View on Solana](https://explorer.solana.com/tx/JHj4HSQZeGrq3dJakbcXmu6qZWF5k3cwcvCz9AE9RQ3MUJfJSqRFo2qUGMWBcmj2rMEjLr1hxTyHkGcNWLEDZnD?cluster=devnet) |
 
 All three transactions demonstrate the complete stablecoin lifecycle: mint
 fiat-backed tokens on demand, execute cross-border settlement, burn tokens to
 release USD backing.
 
-### XRPL Testnet — Full Settlement Dashboard
+### XRPL Testnet — fFull settlement dashboard
 
 Complete 7-screen treasury application with real XRPL transactions including
 issuance, settlement, partial settlement with carry-forward, and reconciliation.
@@ -149,7 +149,7 @@ Reconciliation Engine
 Audit Log + CSV Export
 ```
 
-### Application Screens
+### Application screens
 
 | Screen              | EPIC   | Function                           |
 |---------------------|--------|------------------------------------|
@@ -183,7 +183,7 @@ cp accounts_template.json accounts.json
 Edit `accounts.json` and add your XRPL testnet wallet credentials.
 Get free testnet wallets at: https://faucet.altnet.rippletest.net/accounts
 
-### Run the Application
+### Run the application
 
 ```bash
 python3 reset_demo.py
@@ -192,7 +192,7 @@ python3 app.py
 
 Open http://localhost:5000
 
-### Run Solana Demo
+### Run Solana demo
 
 ```bash
 python3 solana_service.py
@@ -200,7 +200,7 @@ python3 solana_service.py
 
 ---
 
-## 📁 Project Structure
+## 📁 Project structure
 
 ```
 apostal_poc/
@@ -232,7 +232,7 @@ apostal_poc/
 - Real blockchain transactions verified
 - Solana devnet integration
 
-**Phase 2 — CSV Integration**
+**Phase 2 — CSV integration**
 - Automated clearing from parcel CSV data
 - Multi-operator netting engine
 
@@ -244,13 +244,15 @@ apostal_poc/
 - Real USDC on XRPL and Solana mainnet
 - Production treasury controls
 
-**Phase 5 — Multi-Chain**
+**Phase 5 — Multi-chain**
 - Liquidity pooling across chains
 - Automated FX conversion
 
 ---
 
-## 🌍 Real-World Context
+## 🌍 Real-World context
+
+I witness operators struggling with legacy banking infra, high inflation, currency instability. And now the global system itself is shifting; causing fragmentation.
 
 Built for settlement corridors in complement of the Universal Postal Union (UPU) designated operator clearing rules.
 
