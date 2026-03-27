@@ -180,8 +180,7 @@ cp accounts_template.json accounts.json
 
 ### Configure Wallets
 
-Edit `accounts.json` and add your XRPL testnet wallet credentials.
-Get free testnet wallets at: https://faucet.altnet.rippletest.net/accounts
+XRPL testnet wallets and Solana Wallets installed.
 
 ### Run the application
 
