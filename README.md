@@ -2,7 +2,7 @@
 ### Cross-Border parcel Stablecoin settlement for Postal Operators
 
 > Replacing 7-30 day correspondent banking settlement with stablecoin infrastructure
-> that settles in seconds — live on XRPL Testnet and Solana Devnet.
+> that settles in seconds: live on XRPL Testnet and Solana Devnet.
 
 ![Python](https://img.shields.io/badge/Python-3.9-blue)
 ![Flask](https://img.shields.io/badge/Flask-2.0-green)
