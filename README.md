@@ -238,7 +238,7 @@ apostal_poc/
 
 **Phase 3 — Operator Pilot**
 - Real designated operator participation
-- UAE Post and Kenya Post corridor
+- Middle East / Africa corridor
 
 **Phase 4 — Mainnet**
 - Real USDC on XRPL and Solana mainnet
