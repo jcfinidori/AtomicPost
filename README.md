@@ -1,5 +1,5 @@
 # 🏦 AtomicPost
-### Cross-Border parcel Stablecoin settlement for Postal Operators
+### Cross-Border parcel Stablecoin settlement for postal operators
 
 > Replacing 7-30 day correspondent banking settlement with stablecoin infrastructure
 > that settles in seconds: live on XRPL Testnet and Solana Devnet.
@@ -12,7 +12,7 @@
 
 ---
 
-## 🚨 The Problem
+## 🚨 The problem
 
 The global cross-border parcel business still runs on outdated financial rails. Settlements pass through multiple correspondent banks; triggering: fees, delays, trapped liquidity, currency risk.
 
@@ -29,7 +29,7 @@ Postal operators in developing markets bear the highest cost and have uneven acc
 
 ---
 
-## ✅ The Solution
+## ✅ The solution
 
 AtomicPost is a stablecoin treasury infrastructure that replaces correspondent
 banking for cross-border postal settlement. It sits at the settlement layer. Same clearing logic: net positions, issue coins, execute. Final, in seconds. We’re building atomic settlement rails. No correspondent banks. No trapped cash. No FX exposure. This paves the way for programmable value-sharing.
@@ -63,11 +63,11 @@ banking for cross-border postal settlement. It sits at the settlement layer. Sam
 
 ---
 
-## ⛓️ Live Blockchain Transactions
+## ⛓️ Live Blockchain transactions
 
 These are real transactions executed during development. Publicly verifiable now.
 
-### Solana Devnet — Complete USD-ST Lifecycle
+### Solana Devnet: complete USD-ST lifecycle
 
 | Step | Action                                           | Explorer |
 |------|--------------------------------------------------|----------|
@@ -79,14 +79,14 @@ All three transactions demonstrate the complete stablecoin lifecycle: mint
 fiat-backed tokens on demand, execute cross-border settlement, burn tokens to
 release USD backing.
 
-### XRPL Testnet — full settlement dashboard
+### XRPL Testnet: full settlement dashboard
 
 Complete 7-screen treasury application with real XRPL transactions including
 issuance, settlement, partial settlement with carry-forward, and reconciliation.
 
 ---
 
-## 🎯 Key Features
+## 🎯 Key features
 
 ### Stablecoin treasury control
 - Manual USD backing confirmation per cycle
@@ -163,7 +163,7 @@ Audit Log + CSV Export
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick start
 
 ### Prerequisites
 - Python 3.9 or higher
@@ -250,7 +250,7 @@ apostal_poc/
 
 ---
 
-## 🌍 Real-World context
+## 🌍 Real-world context
 
 I witness operators struggling with legacy banking infra, high inflation, currency instability. And now the global system itself is shifting; causing fragmentation.
 
