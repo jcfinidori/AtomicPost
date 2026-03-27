@@ -1,5 +1,5 @@
-# 🏦 PostalSettle
-### Cross-Border Stablecoin Treasury for Postal Operators
+# 🏦 AtomicPost
+### Cross-Border parcel Stablecoin settlement for Postal Operators
 
 > Replacing 7-30 day correspondent banking settlement with stablecoin infrastructure
 > that settles in seconds — live on XRPL Testnet and Solana Devnet.
@@ -14,7 +14,7 @@
 
 ## 🚨 The Problem
 
-Cross-border postal money settlement is broken for small operators:
+The global cross-border parcel business still runs on outdated financial rails. Settlements pass through multiple correspondent banks; triggering: fees, delays, trapped liquidity, currency risk.
 
 | Pain Point        | Current Reality              |
 |-------------------|------------------------------|
@@ -25,15 +25,14 @@ Cross-border postal money settlement is broken for small operators:
 | Working capital   | Trapped in receivables       |
 | Reconciliation    | Manual, error-prone          |
 
-Postal operators in developing markets — La Poste CI, Kenya Post, smaller DOs —
-bear the highest cost and have the least access to trade finance.
+Postal operators in developing markets bear the highest cost and have uneven access to correspondant banks.
 
 ---
 
 ## ✅ The Solution
 
-PostalSettle is a stablecoin treasury infrastructure that replaces correspondent
-banking for cross-border postal settlement.
+AtomicPost is a stablecoin treasury infrastructure that replaces correspondent
+banking for cross-border postal settlement. It sits at the settlement layer. Same clearing logic: net positions, issue coins, execute. Final, in seconds. We’re building atomic settlement rails. No correspondent banks. No trapped cash. No FX exposure. This paves the way for programmable value-sharing.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -89,25 +88,25 @@ issuance, settlement, partial settlement with carry-forward, and reconciliation.
 
 ## 🎯 Key Features
 
-### Stablecoin Treasury Control
+### Stablecoin treasury control
 - Manual USD backing confirmation per cycle
 - Single-action issuance authorization
 - Real-time reserve utilization monitoring
 - Hard cap enforcement on issuance
 
-### Cross-Border Settlement
+### Cross-Border settlement
 - Full and partial settlement execution
 - Automatic carry-forward for partial obligations
 - Inbound and outbound settlement tracking
 - Settlement comparison: traditional vs blockchain
 
-### Blockchain Integration
+### Blockchain integration
 - XRPL Testnet: native issued currency
 - Solana Devnet: SPL token program
 - Chain-agnostic architecture
 - Real transaction verification
 
-### Treasury Operations
+### Treasury operations
 - Automated reconciliation engine
 - Exception detection and management
 - Full audit trail with timestamps
@@ -115,11 +114,11 @@ issuance, settlement, partial settlement with carry-forward, and reconciliation.
 
 ---
 
-## 🏆 Hackathon Track Alignment
+## Hackathon track alignment
 
-**Cross-Border Stablecoin Treasury**
+**Cross-Border stablecoin treasury**
 
-| Requirement                               | PostalSettle                                    |
+| Requirement                               | AtomicPost                                      |
 |-------------------------------------------|-------------------------------------------------|
 | Mint fiat-backed stablecoins on demand    | ✅ USD-ST issuance against confirmed USD        |
 | Redeem stablecoins                        | ✅ Burn flow with USD release                   |
@@ -130,7 +129,7 @@ issuance, settlement, partial settlement with carry-forward, and reconciliation.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 CSV Parcel Data
@@ -253,13 +252,13 @@ apostal_poc/
 
 ## 🌍 Real-World Context
 
-Built for the Universal Postal Union (UPU) designated operator settlement corridor.
+Built for settlement corridors in complement of the Universal Postal Union (UPU) designated operator clearing rules.
 
-**Target corridor:** Middle East to Africa
-**Operators:** La Poste CI, UAE Post, Kenya Post
+**Target corridors:** Middle East to Africa; Asia/Pacific; Europe to Africa
+**Operators:** Designated postal operators
 
 This PoC demonstrates that postal operators can settle cross-border obligations
-without correspondent banking infrastructure — making financial settlement
+without correspondent banking infrastructure; making financial settlement
 accessible to operators in developing markets.
 
 ---
