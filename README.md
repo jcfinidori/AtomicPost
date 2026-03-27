@@ -79,7 +79,7 @@ All three transactions demonstrate the complete stablecoin lifecycle: mint
 fiat-backed tokens on demand, execute cross-border settlement, burn tokens to
 release USD backing.
 
-### XRPL Testnet — fFull settlement dashboard
+### XRPL Testnet — full settlement dashboard
 
 Complete 7-screen treasury application with real XRPL transactions including
 issuance, settlement, partial settlement with carry-forward, and reconciliation.
