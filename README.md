@@ -81,9 +81,18 @@ release USD backing.
 
 ### XRPL Testnet: full settlement dashboard
 
-Complete 7-screen treasury application with real XRPL transactions including
-issuance, settlement, partial settlement with carry-forward, and reconciliation.
+Complete 7-screen treasury application with real transactions including
+issuance, settlement, partial settlement with carry-forward, reconciliation and burn.
 
+### XRPL Demo (Full Application)
+Steps to run app.py and walk through
+all seven screens. Reference DEMO.md
+for the complete walkthrough guide.
+
+### Solana Demo
+python3 solana_service.py
+Shows settlement transactions on 
+Solana devnet with explorer links.
 ---
 
 ## 🎯 Key features
