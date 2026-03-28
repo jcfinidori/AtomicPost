@@ -1,8 +1,8 @@
-# 🏦 PostalSettle
-### Cross-Border Stablecoin Treasury for Postal Operators
+# 🏦 AtomicPost
+### Cross-Border parcel Stablecoin settlement for postal operators
 
 > Replacing 7-30 day correspondent banking settlement with stablecoin infrastructure
-> that settles in seconds — live on XRPL Testnet and Solana Devnet.
+> that settles in seconds: live on XRPL Testnet and Solana Devnet.
 
 ![Python](https://img.shields.io/badge/Python-3.9-blue)
 ![Flask](https://img.shields.io/badge/Flask-2.0-green)
@@ -12,9 +12,9 @@
 
 ---
 
-## 🚨 The Problem
+## 🚨 The problem
 
-Cross-border postal money settlement is broken for small operators:
+The global cross-border parcel business still runs on outdated financial rails. Settlements pass through multiple correspondent banks; triggering: fees, delays, trapped liquidity, currency risk.
 
 | Pain Point        | Current Reality              |
 |-------------------|------------------------------|
@@ -25,15 +25,14 @@ Cross-border postal money settlement is broken for small operators:
 | Working capital   | Trapped in receivables       |
 | Reconciliation    | Manual, error-prone          |
 
-Postal operators in developing markets — La Poste CI, Kenya Post, smaller DOs —
-bear the highest cost and have the least access to trade finance.
+Postal operators in developing markets bear the highest cost and have uneven access to correspondant banks.
 
 ---
 
-## ✅ The Solution
+## ✅ The solution
 
-PostalSettle is a stablecoin treasury infrastructure that replaces correspondent
-banking for cross-border postal settlement.
+AtomicPost is a stablecoin treasury infrastructure that replaces correspondent
+banking for cross-border postal settlement. It sits at the settlement layer. Same clearing logic: net positions, issue coins, execute. Final, in seconds. We’re building atomic settlement rails. No correspondent banks. No trapped cash. No FX exposure. This paves the way for programmable value-sharing.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -64,50 +63,59 @@ banking for cross-border postal settlement.
 
 ---
 
-## ⛓️ Live Blockchain Transactions
+## ⛓️ Live Blockchain transactions
 
-These are real transactions executed during development. Publicly verifiable now.
+These are real transactions executed during development, publicly verifiable on Solana Devnet demonstrating the settlement protocol for Posts.
 
-### Solana Devnet — Complete USD-ST Lifecycle
+### Solana Devnet: complete USD-ST lifecycle
 
-| Step | Action                                           | Explorer |
+| Step | Transaction                                           | Explorer |
 |------|--------------------------------------------------|----------|
-| 1    | USD-ST Issuance — Treasury mints stablecoin      | [View on Solana](https://explorer.solana.com/tx/Wu1xKfofwNvBjcL5C66ZTXjXxcadW4amfXHGbv7zYH7TDJtuuxngUeBh8Jvar2doFB53JKxoKdfUsr7V6vM57Du?cluster=devnet) |
-| 2    | Cross-Border Settlement — Operator payment       | [View on Solana](https://explorer.solana.com/tx/4k7VTSatS7iUyzh7TtwteGT61QarfsXxUPZYvJUc1GhCUYk59JFgrGMmf7NCKfn2TDBSHyUQwaZbnf4QAdmu3pSn?cluster=devnet) |
-| 3    | Token Redemption — Burn and release USD          | [View on Solana](https://explorer.solana.com/tx/JHj4HSQZeGrq3dJakbcXmu6qZWF5k3cwcvCz9AE9RQ3MUJfJSqRFo2qUGMWBcmj2rMEjLr1hxTyHkGcNWLEDZnD?cluster=devnet) |
+| 1    | USD-ST Issuance: treasury mints stablecoin      | [View on Solana](https://explorer.solana.com/tx/Wu1xKfofwNvBjcL5C66ZTXjXxcadW4amfXHGbv7zYH7TDJtuuxngUeBh8Jvar2doFB53JKxoKdfUsr7V6vM57Du?cluster=devnet) |
+| 2    | Cross-Border Settlement: operator payment       | [View on Solana](https://explorer.solana.com/tx/4k7VTSatS7iUyzh7TtwteGT61QarfsXxUPZYvJUc1GhCUYk59JFgrGMmf7NCKfn2TDBSHyUQwaZbnf4QAdmu3pSn?cluster=devnet) |
+| 3    | Token Redemption: burn and release              | [View on Solana](https://explorer.solana.com/tx/JHj4HSQZeGrq3dJakbcXmu6qZWF5k3cwcvCz9AE9RQ3MUJfJSqRFo2qUGMWBcmj2rMEjLr1hxTyHkGcNWLEDZnD?cluster=devnet) |
 
 All three transactions demonstrate the complete stablecoin lifecycle: mint
 fiat-backed tokens on demand, execute cross-border settlement, burn tokens to
 release USD backing.
 
-### XRPL Testnet — Full Settlement Dashboard
+### XRPL Testnet: full settlement dashboard
 
-Complete 7-screen treasury application with real XRPL transactions including
-issuance, settlement, partial settlement with carry-forward, and reconciliation.
+Complete 7-screen treasury application with real transactions including
+issuance, settlement, partial settlement with carry-forward, reconciliation and burn.
 
+### XRPL Demo (Full Application)
+Steps to run app.py and walk through
+all seven screens. Reference DEMO.md
+for the complete walkthrough guide.
+
+### Solana Demo
+python3 solana_service.py
+Shows settlement transactions on 
+Solana devnet with explorer links.
 ---
 
-## 🎯 Key Features
+## 🎯 Key features
 
-### Stablecoin Treasury Control
+### Stablecoin treasury control
 - Manual USD backing confirmation per cycle
 - Single-action issuance authorization
 - Real-time reserve utilization monitoring
 - Hard cap enforcement on issuance
 
-### Cross-Border Settlement
+### Cross-Border settlement
 - Full and partial settlement execution
 - Automatic carry-forward for partial obligations
 - Inbound and outbound settlement tracking
 - Settlement comparison: traditional vs blockchain
 
-### Blockchain Integration
+### Blockchain integration
 - XRPL Testnet: native issued currency
 - Solana Devnet: SPL token program
 - Chain-agnostic architecture
 - Real transaction verification
 
-### Treasury Operations
+### Treasury operations
 - Automated reconciliation engine
 - Exception detection and management
 - Full audit trail with timestamps
@@ -115,11 +123,11 @@ issuance, settlement, partial settlement with carry-forward, and reconciliation.
 
 ---
 
-## 🏆 Hackathon Track Alignment
+## Hackathon track alignment
 
-**Cross-Border Stablecoin Treasury**
+**Cross-Border stablecoin treasury**
 
-| Requirement                               | PostalSettle                                    |
+| Requirement                               | AtomicPost                                      |
 |-------------------------------------------|-------------------------------------------------|
 | Mint fiat-backed stablecoins on demand    | ✅ USD-ST issuance against confirmed USD        |
 | Redeem stablecoins                        | ✅ Burn flow with USD release                   |
@@ -130,7 +138,7 @@ issuance, settlement, partial settlement with carry-forward, and reconciliation.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 CSV Parcel Data
@@ -150,7 +158,7 @@ Reconciliation Engine
 Audit Log + CSV Export
 ```
 
-### Application Screens
+### Application screens
 
 | Screen              | EPIC   | Function                           |
 |---------------------|--------|------------------------------------|
@@ -164,7 +172,7 @@ Audit Log + CSV Export
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick start
 
 ### Prerequisites
 - Python 3.9 or higher
@@ -181,10 +189,9 @@ cp accounts_template.json accounts.json
 
 ### Configure Wallets
 
-Edit `accounts.json` and add your XRPL testnet wallet credentials.
-Get free testnet wallets at: https://faucet.altnet.rippletest.net/accounts
+XRPL testnet wallets and Solana Wallets installed.
 
-### Run the Application
+### Run the application
 
 ```bash
 python3 reset_demo.py
@@ -193,7 +200,7 @@ python3 app.py
 
 Open http://localhost:5000
 
-### Run Solana Demo
+### Run Solana demo
 
 ```bash
 python3 solana_service.py
@@ -201,7 +208,7 @@ python3 solana_service.py
 
 ---
 
-## 📁 Project Structure
+## 📁 Project structure
 
 ```
 apostal_poc/
@@ -233,33 +240,35 @@ apostal_poc/
 - Real blockchain transactions verified
 - Solana devnet integration
 
-**Phase 2 — CSV Integration**
+**Phase 2 — CSV integration**
 - Automated clearing from parcel CSV data
 - Multi-operator netting engine
 
 **Phase 3 — Operator Pilot**
 - Real designated operator participation
-- UAE Post and Kenya Post corridor
+- Middle East / Africa corridor
 
 **Phase 4 — Mainnet**
 - Real USDC on XRPL and Solana mainnet
 - Production treasury controls
 
-**Phase 5 — Multi-Chain**
+**Phase 5 — Multi-chain**
 - Liquidity pooling across chains
 - Automated FX conversion
 
 ---
 
-## 🌍 Real-World Context
+## 🌍 Real-world context
 
-Built for the Universal Postal Union (UPU) designated operator settlement corridor.
+I witness operators struggling with legacy banking infra, high inflation, currency instability. And now the global system itself is shifting; causing fragmentation.
 
-**Target corridor:** Middle East to Africa
-**Operators:** La Poste CI, UAE Post, Kenya Post
+Built for settlement corridors in complement of the Universal Postal Union (UPU) designated operator clearing rules.
+
+**Target corridors:** Middle East to Africa; Asia/Pacific; Europe to Africa
+**Operators:** Designated postal operators
 
 This PoC demonstrates that postal operators can settle cross-border obligations
-without correspondent banking infrastructure — making financial settlement
+without correspondent banking infrastructure; making financial settlement
 accessible to operators in developing markets.
 
 ---
