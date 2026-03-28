@@ -65,15 +65,15 @@ banking for cross-border postal settlement. It sits at the settlement layer. Sam
 
 ## ⛓️ Live Blockchain transactions
 
-These are real transactions executed during development. Publicly verifiable now.
+These are real transactions executed during development, publicly verifiable on Solana Devnet demonstrating the settlement protocol for Posts.
 
 ### Solana Devnet: complete USD-ST lifecycle
 
-| Step | Action                                           | Explorer |
+| Step | Transaction                                           | Explorer |
 |------|--------------------------------------------------|----------|
 | 1    | USD-ST Issuance: treasury mints stablecoin      | [View on Solana](https://explorer.solana.com/tx/Wu1xKfofwNvBjcL5C66ZTXjXxcadW4amfXHGbv7zYH7TDJtuuxngUeBh8Jvar2doFB53JKxoKdfUsr7V6vM57Du?cluster=devnet) |
 | 2    | Cross-Border Settlement: operator payment       | [View on Solana](https://explorer.solana.com/tx/4k7VTSatS7iUyzh7TtwteGT61QarfsXxUPZYvJUc1GhCUYk59JFgrGMmf7NCKfn2TDBSHyUQwaZbnf4QAdmu3pSn?cluster=devnet) |
-| 3    | Token Redemption: burn and release USD          | [View on Solana](https://explorer.solana.com/tx/JHj4HSQZeGrq3dJakbcXmu6qZWF5k3cwcvCz9AE9RQ3MUJfJSqRFo2qUGMWBcmj2rMEjLr1hxTyHkGcNWLEDZnD?cluster=devnet) |
+| 3    | Token Redemption: burn and release              | [View on Solana](https://explorer.solana.com/tx/JHj4HSQZeGrq3dJakbcXmu6qZWF5k3cwcvCz9AE9RQ3MUJfJSqRFo2qUGMWBcmj2rMEjLr1hxTyHkGcNWLEDZnD?cluster=devnet) |
 
 All three transactions demonstrate the complete stablecoin lifecycle: mint
 fiat-backed tokens on demand, execute cross-border settlement, burn tokens to
